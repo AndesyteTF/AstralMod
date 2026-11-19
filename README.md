@@ -5,6 +5,8 @@
 Way too much in one place obviously, this is pasted on top of pasted  
 Use it how you wish, This will continue to be maintained just open source now  
 
+Yes this is beyond pasted, alot of it's features are ports from other cheats  
+
 Build it with Clang-cl (Get it from Visual Studio LLVM Packages)  
 A build script has been provided for your use  
 It will make both AVX2 and SSE DLLs inside a "Dist" folder  
