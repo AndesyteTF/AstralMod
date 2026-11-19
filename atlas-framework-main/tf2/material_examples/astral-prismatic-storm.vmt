@@ -1,0 +1,69 @@
+// AstralMod custom-chams stress test.
+// Uses only stock TF2 textures and several independent material proxies.
+VertexLitGeneric
+{
+    "$basetexture" "white"
+    "$detail" "effects/tiledfire/fireLayeredSlowTiled512"
+    "$detailframe" "0"
+    "$detailblendmode" "0"
+    "$detailblendfactor" "1.0"
+    "$detailscale" "1.35"
+
+    "$envmap" "cubemaps/cubemap_sheen001"
+    "$envmaptint" "[0.55 0.18 0.95]"
+    "$envmapcontrast" "1"
+    "$envmapsaturation" "1"
+
+    "$phong" "1"
+    "$phongexponent" "18"
+    "$phongboost" "2.5"
+    "$phongfresnelranges" "[0.05 0.45 1]"
+    "$rimlight" "1"
+    "$rimlightexponent" "3"
+    "$rimlightboost" "2"
+
+    "$selfillum" "1"
+    "$selfillumfresnel" "1"
+    "$selfillumfresnelminmaxexp" "[0.05 0.65 2.25]"
+    "$selfillumtint" "[0.45 0.08 1.0]"
+    "$model" "1"
+    "$nodecal" "1"
+    "$nofog" "1"
+
+    "Proxies"
+    {
+        "AnimatedTexture"
+        {
+            "animatedtexturevar" "$detail"
+            "animatedtextureframenumvar" "$detailframe"
+            "animatedtextureframerate" "24"
+        }
+        "TextureScroll"
+        {
+            "texturescrollvar" "$detailtexturetransform"
+            "texturescrollrate" "0.32"
+            "texturescrollangle" "35"
+        }
+        "Sine"
+        {
+            "sineperiod" "1.6"
+            "sinemin" "0.35"
+            "sinemax" "1.0"
+            "resultvar" "$detailblendfactor"
+        }
+        "Sine"
+        {
+            "sineperiod" "2.35"
+            "sinemin" "0.8"
+            "sinemax" "5.5"
+            "resultvar" "$phongboost"
+        }
+        "Sine"
+        {
+            "sineperiod" "1.15"
+            "sinemin" "0.4"
+            "sinemax" "4.0"
+            "resultvar" "$rimlightboost"
+        }
+    }
+}

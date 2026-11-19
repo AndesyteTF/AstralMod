@@ -1,0 +1,11 @@
+#include "resource.h"
+
+IDR_VACBYPASS RCDATA ".\\res\\VAC-Bypass.dll"
+IDR_ICON ICON ".\\res\\icon.ico"
+
+IDR_ICON_ICO RCDATA ".\\res\\Icon.ico"
+IDR_MUSIC_MAIN RCDATA ".\\res\\AstralMod\\music.mp3"
+IDR_SPLASH RCDATA ".\\res\\splash.png"
+IDR_ART_LOGO RCDATA ".\\res\\logo.png"
+IDR_ART_BANNER RCDATA ".\\res\\banner.png"
+IDR_ART_TF2HERO RCDATA ".\\res\\tf2hero.png"
