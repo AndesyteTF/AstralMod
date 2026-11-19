@@ -1,5 +1,6 @@
 <div align=center>
 
+# AstralMod Team Fortress 2
 ![banner](banner.png)  
 Way too much in one place obviously, this is pasted on top of pasted  
 Use it how you wish, This will continue to be maintained just open source now  
