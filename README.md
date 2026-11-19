@@ -15,6 +15,11 @@ Discord? No, not after what happened to the first one
 AstralMod follows a Bleeding Edge workflow, Expect bugs and issues  
 Feel free to report them in the Issues  
 
+# External Dependencies  
+Yea we know stupid, We utilized [Nihon's Music Framework](https://github.com/com/XeraFang-Solutions/Music-Framework) for its NoCRT library and headers  
+This is what lets us display music from the windows media session directly without CRT  
+Just put it in `externals/Music-Framework` and Astral will compile  
+
 # Loader
 Our loader is built using regular `MSBUILD`, It sends information to the cheat for your `Username`  
 The loader can also load any DLLs in the same folder as itself, So have fun with it  

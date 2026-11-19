@@ -98,7 +98,7 @@ features/triggerbot.cpp
 )
 
 target_include_directories(atlas_tf2 PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
-set(ATLAS_MUSIC_FRAMEWORK "${PROJECT_SOURCE_DIR}/../../music-framework" CACHE PATH
+set(ATLAS_MUSIC_FRAMEWORK "${PROJECT_SOURCE_DIR}/../externals/music-framework" CACHE PATH
     "Path to the Nihon's Music Framework source tree")
 set(ATLAS_MUSIC_FRAMEWORK_LIB_DIR "${ATLAS_MUSIC_FRAMEWORK}/build-x64-nocrt/Release")
 

@@ -3,7 +3,7 @@ param(
     [string]$Configuration = "RelWithDebInfo",
     [ValidateSet("Stable", "Beta")]
     [string]$Channel = "Beta",
-    [string]$MusicFrameworkPath = (Join-Path $PSScriptRoot "../../music-framework"),
+    [string]$MusicFrameworkPath = (Join-Path $PSScriptRoot "../externals/music-framework"),
     [int]$Jobs = 4
 )
 
