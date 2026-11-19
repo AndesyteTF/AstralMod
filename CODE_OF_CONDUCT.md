@@ -1,4 +1,4 @@
-# Nihon's Music Framework Code of Conduct
+# AstralMod
 
 This project follows the Contributor Covenant Code of Conduct.
 
