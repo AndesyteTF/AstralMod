@@ -37,3 +37,20 @@ The website will never be open source, It's not important enough to care about
 
 # Playerlist/Database
 We use Lunaris' public database and our own database for player marks  
+
+# Credits  
+The Atlas Developers - The Base Cheat Itself  
+SEOwned by [Spook953](https://github.com/spook953) as it was the first cheat I ever got to toy with the source of  
+[FedoraWare's](https://github.com/Fedoraware/Fedoraware) [Legacy](https://github.com/Fedoraware/Fedoraloader-Legacy) and [Final](https://github.com/Fedoraware/Fedoraloader) Loaders, for their injection was the true original base  
+[Amalgam](https://github.com/rei-2/Amalgam) - Several features ported including different aimtypes  
+[Unibox](https://github.com/GatoPotato658/Unibox) - Ported the Telemetry Blocker from them  
+> Wow I actually found something useful in there  
+
+HackVSHack.net - Many sources we pulled from for our project including the [Original Loader Source](https://hackvshack.net/threads/astral-loader-wannabe-framework.13357/)  
+[Botox](https://github.com/gumballpanties-sudo/botox-tf2) for the Movement Lab  
+[kdt255](https://github.com/kdt255/Astral-Remake) as their Astral Menu is what inspired the NextGen GUI
+[Daniel Krupinski](https://github.com/danielkrupinski/vac-bypass) for their amazing Vac Bypass as a base for our VACSAFE Module
+[Guided Hacking](https://github.com/guidedhacking/GuidedHacking-Injector) for both their Injector to learn from and their forums with guidance to make this real  
+[Ateris Technologies](https://github.com/eternal-blu/ateris-technologies) for being one of the first cheats I ever learned from and worked on  
+[RijiN (RileyKun's fork)](https://github.com/RileyKun/RijiN) for an excellent source of knowledge and helpful learning NoCRT  
+And finally, Those who gave recommendations, feedback, and have helped with testing as without you this wouldn't be here
