@@ -56,6 +56,24 @@ namespace render
         return result > 255u ? 255u : static_cast< u8 >( result );
     }
 
+    static bool quality_is_aliased( text_quality quality )
+    {
+        // Only the hard-edge mode uses monochrome bitmaps. Every other quality mode uses
+        // grayscale glyph coverage so it can be blended by the text atlas.
+        return quality == text_quality::aliased;
+    }
+
+    static DWORD gdi_font_quality( text_quality quality )
+    {
+        switch ( quality )
+        {
+            case text_quality::aliased: return NONANTIALIASED_QUALITY;
+            case text_quality::antialiased: return ANTIALIASED_QUALITY;
+            case text_quality::cleartype: return CLEARTYPE_QUALITY;
+            default: return PROOF_QUALITY;
+        }
+    }
+
     static bool push_vertex( atl::vector< d3d9::overlay_vertex > &vertices, float x, float y, u32 color,
                              float u = 0.0f, float v = 0.0f )
     {
@@ -2402,7 +2420,7 @@ namespace render
         return atlas.m_ready && atlas.m_texture &&
                atlas.m_font_height == font.m_height &&
                atlas.m_font_weight == font.m_weight &&
-               atlas.m_crisp == font.m_crisp &&
+               atlas.m_quality == font.m_quality &&
                str::equals( atlas.m_face.c_str( ), font.m_face.c_str( ) );
     }
 
@@ -2504,8 +2522,9 @@ namespace render
 
         HDC measure_context{ measure.m_context };
 
-        const auto quality{ font.m_crisp ? NONANTIALIASED_QUALITY : PROOF_QUALITY };
-        const auto outline_format{ font.m_crisp ? GGO_BITMAP : GGO_GRAY8_BITMAP };
+        const bool  mono{ quality_is_aliased( font.m_quality ) };
+        const DWORD quality{ gdi_font_quality( font.m_quality ) };
+        const auto  outline_format{ mono ? GGO_BITMAP : GGO_GRAY8_BITMAP };
 
         HGDIOBJ gdi_font{ this->m_gdi.CreateFontA( font.m_height, font.m_weight, font.m_face.c_str( ), quality ) };
 
@@ -2743,8 +2762,8 @@ namespace render
                     break;
                 }
 
-                u32 source_pitch{ font.m_crisp ? glyph_mono_pitch( metrics.gmBlackBoxX )
-                                               : glyph_bitmap_pitch( metrics.gmBlackBoxX ) };
+                u32 source_pitch{ mono ? glyph_mono_pitch( metrics.gmBlackBoxX )
+                                       : glyph_bitmap_pitch( metrics.gmBlackBoxX ) };
                 u64 required_bitmap_size{ static_cast< u64 >( source_pitch ) *
                                           static_cast< u64 >( metrics.gmBlackBoxY ) };
 
@@ -2761,7 +2780,7 @@ namespace render
 
                     for ( u32 glyph_x{ }; glyph_x < glyph.m_bitmap_width; ++glyph_x )
                     {
-                        u8  alpha{ font.m_crisp
+                        u8  alpha{ mono
                                        ? ( ( source_row[ glyph_x >> 3u ] >> ( 7u - ( glyph_x & 7u ) ) ) & 1u
                                                ? static_cast< u8 >( 255 )
                                                : static_cast< u8 >( 0 ) )
@@ -2808,7 +2827,7 @@ namespace render
         atlas_texture.Detach( );
         atlas.m_font_height = font.m_height;
         atlas.m_font_weight = font.m_weight;
-        atlas.m_crisp       = font.m_crisp;
+        atlas.m_quality       = font.m_quality;
         atlas.m_width       = atlas_width;
         atlas.m_height      = atlas_height;
         atlas.m_line_height = line_height;
@@ -2866,6 +2885,7 @@ namespace render
         atlas.m_face.clear( );
         atlas.m_font_height = 0;
         atlas.m_font_weight = 0;
+        atlas.m_quality     = text_quality::default_quality;
         atlas.m_width       = 0;
         atlas.m_height      = 0;
         atlas.m_line_height = 0;
@@ -3040,7 +3060,7 @@ namespace render
 
             font->m_height = -static_cast< i32 >( resource->m_pixel_size );
             font->m_weight = resource->m_weight;
-            font->m_crisp  = resource->m_crisp;
+            font->m_quality = resource->m_quality;
             return true;
         }
 
@@ -3057,6 +3077,7 @@ namespace render
 
             font->m_height = -static_cast< i32 >( DEFAULT_FONT_PIXEL_SIZE );
             font->m_weight = FW_NORMAL;
+            font->m_quality = text_quality::default_quality;
             return true;
         }
 
@@ -3067,6 +3088,7 @@ namespace render
 
         font->m_height = -static_cast< i32 >( DEFAULT_FONT_PIXEL_SIZE );
         font->m_weight = FW_NORMAL;
+        font->m_quality = text_quality::default_quality;
         return true;
     }
 
@@ -3076,13 +3098,13 @@ namespace render
 
     bool backend::setup_fonts( )
     {
-        return this->m_fonts.register_system( ATLAS_XORSTR_STATIC( "Atlas Compact" ), ATLAS_XORSTR_STATIC( "Tahoma" ), 11u, FW_NORMAL, true ) &&
-               this->m_fonts.register_system( ATLAS_XORSTR_STATIC( "Atlas Compact Bd" ), ATLAS_XORSTR_STATIC( "Tahoma" ), 11u, FW_BOLD, true ) &&
-               this->m_fonts.register_system( ATLAS_XORSTR_STATIC( "Atlas Compact Sm" ), ATLAS_XORSTR_STATIC( "Tahoma" ), 10u, FW_NORMAL, true ) &&
+        return this->m_fonts.register_system( ATLAS_XORSTR_STATIC( "Atlas Compact" ), ATLAS_XORSTR_STATIC( "Tahoma" ), 11u, FW_NORMAL, text_quality::antialiased ) &&
+               this->m_fonts.register_system( ATLAS_XORSTR_STATIC( "Atlas Compact Bd" ), ATLAS_XORSTR_STATIC( "Tahoma" ), 11u, FW_BOLD, text_quality::antialiased ) &&
+               this->m_fonts.register_system( ATLAS_XORSTR_STATIC( "Atlas Compact Sm" ), ATLAS_XORSTR_STATIC( "Tahoma" ), 10u, FW_NORMAL, text_quality::antialiased ) &&
                this->m_fonts.register_system( ATLAS_XORSTR_STATIC( "ESP Small" ), ATLAS_XORSTR_STATIC( "Small Fonts" ), 7u, FW_NORMAL ) &&
-               this->m_fonts.register_system( ATLAS_XORSTR_STATIC( "ESP Name" ), ATLAS_XORSTR_STATIC( "Tahoma" ), 11u, FW_NORMAL, true ) &&
-               this->m_fonts.register_system( ATLAS_XORSTR_STATIC( "Debug Overlay" ), ATLAS_XORSTR_STATIC( "Consolas" ), 14u, FW_NORMAL, true ) &&
-               this->m_fonts.register_system( ATLAS_XORSTR_STATIC( "Atlas Mono" ), ATLAS_XORSTR_STATIC( "Consolas" ), 12u, FW_NORMAL );
+               this->m_fonts.register_system( ATLAS_XORSTR_STATIC( "ESP Name" ), ATLAS_XORSTR_STATIC( "Tahoma" ), 11u, FW_NORMAL, text_quality::antialiased ) &&
+               this->m_fonts.register_system( ATLAS_XORSTR_STATIC( "Debug Overlay" ), ATLAS_XORSTR_STATIC( "Consolas" ), 14u, FW_NORMAL, text_quality::antialiased ) &&
+               this->m_fonts.register_system( ATLAS_XORSTR_STATIC( "Atlas Mono" ), ATLAS_XORSTR_STATIC( "Consolas" ), 12u, FW_NORMAL, text_quality::antialiased );
     }
 
     bool backend::set_ui_font( const char *face )

@@ -91,7 +91,7 @@ namespace render
         fixed_string< FONT_NAME_CAPACITY > m_face{ };
         i32                                m_font_height{ };
         i32                                m_font_weight{ };
-        bool                               m_crisp{ };
+        text_quality                       m_quality{ text_quality::default_quality };
         u32                                m_width{ };
         u32                                m_height{ };
         u32                                m_line_height{ };
@@ -103,7 +103,7 @@ namespace render
         fixed_string< FONT_NAME_CAPACITY > m_face{ };
         i32                                m_height{ -static_cast< i32 >( DEFAULT_FONT_PIXEL_SIZE ) };
         i32                                m_weight{ FW_NORMAL };
-        bool                               m_crisp{ };
+        text_quality                       m_quality{ text_quality::default_quality };
     };
 
     enum class command_type : u32

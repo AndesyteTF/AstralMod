@@ -2,7 +2,6 @@
 
 namespace render
 {
-
     bool font_manager::init( gdi::api *api )
     {
         if ( !api || !api->Ready( ) )
@@ -27,14 +26,17 @@ namespace render
             }
         }
 
-        this->m_resources.reset( );
+        for ( usize index{ }; index < this->m_resource_count; ++index )
+        {
+            this->m_resources[ index ] = font_resource_t{ };
+        }
 
         this->m_resource_count = 0;
         this->m_api            = nullptr;
     }
 
     bool font_manager::register_memory( const char *name, const char *face, const u8 *data, u32 size,
-                                        u32 pixel_size, i32 weight, bool crisp )
+                                        u32 pixel_size, i32 weight, text_quality quality )
     {
         if ( !name || !face || !data || !size || !pixel_size || !this->ready( ) )
         {
@@ -46,7 +48,7 @@ namespace render
             return existing->m_handle != nullptr;
         }
 
-        if ( this->m_resource_count >= this->m_resources.size( ) )
+        if ( this->m_resource_count >= MAX_FONT_RESOURCES )
         {
             return false;
         }
@@ -66,7 +68,7 @@ namespace render
         resource.m_size       = size;
         resource.m_pixel_size = pixel_size;
         resource.m_weight     = weight;
-        resource.m_crisp      = crisp;
+        resource.m_quality    = quality;
         resource.m_handle     = handle;
         resource.m_font_count = font_count;
         ++this->m_resource_count;
@@ -74,7 +76,7 @@ namespace render
     }
 
     bool font_manager::register_system( const char *name, const char *face,
-                                        u32 pixel_size, i32 weight, bool crisp )
+                                        u32 pixel_size, i32 weight, text_quality quality )
     {
         if ( !name || !face || !pixel_size || !this->system_ready( ) )
         {
@@ -86,19 +88,27 @@ namespace render
             return !existing->m_data && !existing->m_size;
         }
 
-        if ( this->m_resource_count >= this->m_resources.size( ) )
+        if ( this->m_resource_count >= MAX_FONT_RESOURCES )
         {
             return false;
         }
 
         font_resource_t &resource{ this->m_resources[ this->m_resource_count ] };
-        resource.m_name = name;
+        resource.m_name       = name;
         str::copy( resource.m_face, sizeof( resource.m_face ), face );
         resource.m_pixel_size = pixel_size;
         resource.m_weight     = weight;
-        resource.m_crisp      = crisp;
+        resource.m_quality    = quality;
         ++this->m_resource_count;
         return true;
+    }
+
+    void font_manager::set_quality( const char *name, text_quality quality )
+    {
+        if ( font_resource_t *resource{ this->find( name ) } )
+        {
+            resource->m_quality = quality;
+        }
     }
 
     const font_resource_t *font_manager::font( const char *name ) const
