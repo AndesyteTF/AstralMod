@@ -237,9 +237,13 @@ void bone_setup::store_shown_pose( C_TFPlayer *entity )
 
 bool bone_setup::read( slot_t &slot, const studiohdr_t *header, pose_snapshot_t &snapshot )
 {
-    while ( slot.m_busy.exchange( true ) )
+    bool expected{ false };
+    if ( !slot.m_busy.compare_exchange( expected, true ) )
     {
-        _mm_pause( );
+        // Bone setup can run from the model worker while animation snapshots are
+        // being updated. A reader must never stall either thread waiting for a
+        // diagnostic/cosmetic pose; the next frame can use the fresh snapshot.
+        return false;
     }
 
     const bool stored{ slot.m_version > 0 && slot.m_header == header };
@@ -268,9 +272,12 @@ void bone_setup::store( C_TFPlayer *entity, slot_t &slot )
         return;
     }
 
-    while ( slot.m_busy.exchange( true ) )
+    bool expected{ false };
+    if ( !slot.m_busy.compare_exchange( expected, true ) )
     {
-        _mm_pause( );
+        // Do not block a network update behind a render-thread bone build. The
+        // following simulation update will provide another snapshot.
+        return;
     }
 
     if ( this->capture( entity, slot.m_snapshot ) )
@@ -304,24 +311,15 @@ bool bone_setup::player_setup( C_TFPlayer *entity, matrix3x4 *out, i32 max_bones
 
     slot_t &slot{ this->m_slots[ entity->entindex( ) ] };
 
-#if defined( ASTRAL_DEV )
-    bool contended{ };
-
-    while ( slot.m_busy.exchange( true ) )
+    bool expected{ false };
+    if ( !slot.m_busy.compare_exchange( expected, true ) )
     {
-        contended = true;
+        // SetupBones is called directly from player model submission. Waiting
+        // here blocks the render thread and presents as a large frametime spike.
+        // Returning false makes hkSetupBones use TF2's original bone path for
+        // this draw; custom bones will be tried again on the next call.
+        return false;
     }
-
-    if ( contended )
-    {
-        DBGOUT( "bones[%d]: two threads asked for the same player", entity->entindex( ) );
-    }
-#else
-    while ( slot.m_busy.exchange( true ) )
-    {
-        _mm_pause( );
-    }
-#endif
 
     bool result{ slot.m_version > 0 && slot.m_header == studio->m_pStudioHdr };
 
