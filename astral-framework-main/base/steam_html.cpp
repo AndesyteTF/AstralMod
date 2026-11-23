@@ -123,7 +123,8 @@ ASTRAL_FORCE_INLINE i32 hex_digit( char value )
 bool decode_bridge_message( const char *url, char ( &message )[ HTML_MESSAGE_LENGTH + 1 ] )
 {
     auto prefix{ ASTRAL_XORSTR( "astral-message:" ) };
-    const usize prefix_length{ 14 };
+    // WOW SO THIS IS WHAT BROKE THE MASCOT AND STEAMHTML ENTIRELY
+    const usize prefix_length{ str::length( prefix.get( ) ) };
     const usize length{ url ? str::length( url ) : 0 };
     if ( !url || !str::starts_with( url, length, prefix.get( ), prefix_length ) ) return false;
 
