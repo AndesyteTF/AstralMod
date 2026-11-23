@@ -977,7 +977,6 @@ u32 ASTRAL_STDCALL astral_thread( void *parameter )
 
         g_tf2.mat_managedtextures->SetValue( 1 );
         g_tf2.mat_forcemanagedtextureintohardware->SetValue( 0 );
-        g_tf2.r_drawbatchdecals->SetValue( 1 );
 
         g_tf2.r_drawtracers->SetValue( 1 );
         g_tf2.r_drawtracers_firstperson->SetValue( 1 );
