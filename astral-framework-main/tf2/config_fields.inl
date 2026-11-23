@@ -385,6 +385,7 @@ static void config_fields( config::misc_t &value, visitor &field )
     field( ASTRAL_XORSTR( "seed_indicator_pos" ).get( ), value.m_seed_indicator_position );
     field( ASTRAL_XORSTR( "party_network" ).get( ), value.m_party_network );
     field( ASTRAL_XORSTR( "watchdog" ).get( ), value.m_watchdog );
+    field( ASTRAL_XORSTR( "watchdog_quality" ).get( ), value.m_watchdog_quality );
     field( ASTRAL_XORSTR( "watchdog_post_to_party" ).get( ), value.m_watchdog_notify_party );
     field( ASTRAL_XORSTR( "behavior_scanner" ).get( ), value.m_behavior_scanner );
     field( ASTRAL_XORSTR( "crash_reports" ).get( ), value.m_crash_reports );
@@ -693,6 +694,7 @@ static void config_fields( config::ragebot_t &value, visitor &field )
     field( ASTRAL_XORSTR( "fov_color" ).get( ), value.m_fov_color );
     field( ASTRAL_XORSTR( "draw_crosshair" ).get( ), value.m_draw_crosshair );
     field( ASTRAL_XORSTR( "auto_shoot" ).get( ), value.m_auto_shoot );
+    field( ASTRAL_XORSTR( "delay_shot" ).get( ), value.m_delay_shot );
     field( ASTRAL_XORSTR( "allow_aim_in_ui" ).get( ), value.m_allow_aim_in_ui );
     field( ASTRAL_XORSTR( "manual_backtrack" ).get( ), value.m_manual_backtrack );
     field( ASTRAL_XORSTR( "backtrack_crosshair" ).get( ), value.m_backtrack_crosshair );

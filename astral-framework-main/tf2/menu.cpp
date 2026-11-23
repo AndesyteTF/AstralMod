@@ -1232,12 +1232,21 @@ static void build_ragebot( )
     notice->set_render_on( &ragebot_context_missing );
 
     auto enabled{ global->add< gui::checkbox >( ASTRAL_XORSTR_STATIC( "Enabled" ), &g_cfg.m_ragebot.m_enabled ) };
-    enabled->add_module< gui::keybind >( atl::string_view{ }, &g_cfg.m_ragebot.m_activate_key );
+    enabled->add_module< gui::keybind >( atl::string_view{ }, &g_cfg.m_ragebot.m_activate_key, true );
     enabled->set_render_on( &ragebot_context_available );
 
     auto auto_shoot{ global->add< gui::checkbox >( ASTRAL_XORSTR_STATIC( "Auto-shoot" ), &g_cfg.m_ragebot.m_auto_shoot ) };
     auto_shoot->set_tooltip( ASTRAL_XORSTR_STATIC( "Let the ragebot automatically shoot when a target is found and states are optimal." ) );
     SET_ELEMENT( auto_shoot );
+
+    static const auto ragebot_on_attack = ( bool ( * )( ) )( [ ]
+    {
+        return is_able_to_configure_ragebot_option( ) &&
+               g_cfg.m_ragebot.m_activate_key.m_mode == bind_mode_t::on_attack;
+    } );
+    auto delay_shot{ global->add< gui::checkbox >( ASTRAL_XORSTR_STATIC( "Delay shot" ), &g_cfg.m_ragebot.m_delay_shot ) };
+    delay_shot->set_tooltip( ASTRAL_XORSTR_STATIC( "In On attack mode, holds the requested shot until the aimbot has reached the target and all firing checks pass." ) );
+    delay_shot->set_render_on( ragebot_on_attack );
 
     auto manual_backtrack{ global->add< gui::checkbox >( ASTRAL_XORSTR_STATIC( "Backtrack manual shots" ), &g_cfg.m_ragebot.m_manual_backtrack ) };
     manual_backtrack->set_tooltip( ASTRAL_XORSTR_STATIC( "Rewinds a manually aimed hitscan shot to the valid history record beneath your crosshair. It does not move your view or fire for you." ) );
@@ -1295,7 +1304,7 @@ static void build_ragebot( )
             g_cfg.m_ragebot.m_spectator_firstperson_type,
         };
         for ( usize type : types )
-            if ( type == config::ragebot_t::AIM_HUMANIZED ) return true;
+            if ( type == config::ragebot_t::AIM_HUMANIZED || type == config::ragebot_t::AIM_LEGIT ) return true;
         return false;
     } );
 
@@ -1313,12 +1322,12 @@ static void build_ragebot( )
 
     auto human_reaction{ global->add< gui::slider_range_int >( ASTRAL_XORSTR_STATIC( "Human reaction" ),
         &g_cfg.m_ragebot.m_humanized_reaction_ms_min, &g_cfg.m_ragebot.m_humanized_reaction_ms_max, 0, 1000, ASTRAL_XORSTR_STATIC( "ms" ) ) };
-    human_reaction->set_tooltip( ASTRAL_XORSTR_STATIC( "Randomized delay range before Humanized aim starts committing to a newly acquired target." ) );
+    human_reaction->set_tooltip( ASTRAL_XORSTR_STATIC( "Randomized delay range before Humanized or Legit aim starts committing to a newly acquired target." ) );
     human_reaction->set_render_on( ragebot_humanized_aim );
 
     auto human_fire_delay{ global->add< gui::slider_range_int >( ASTRAL_XORSTR_STATIC( "Human fire delay" ),
         &g_cfg.m_ragebot.m_humanized_fire_delay_ms_min, &g_cfg.m_ragebot.m_humanized_fire_delay_ms_max, 0, 1000, ASTRAL_XORSTR_STATIC( "ms" ) ) };
-    human_fire_delay->set_tooltip( ASTRAL_XORSTR_STATIC( "Randomized settle delay range after alignment before Humanized auto-shoot fires (hitscan/melee)." ) );
+    human_fire_delay->set_tooltip( ASTRAL_XORSTR_STATIC( "Randomized settle delay range after alignment before Humanized or Legit auto-shoot fires (hitscan/melee)." ) );
     human_fire_delay->set_render_on( ragebot_humanized_aim );
 
     auto human_projectile_fire_delay{ global->add< gui::slider_range_int >( ASTRAL_XORSTR_STATIC( "Human projectile delay" ),
@@ -4790,6 +4799,18 @@ static void build_misc_general( gui::tab *misc )
 
     watchdog_enabled->set_tooltip( ASTRAL_XORSTR_STATIC( "Conclusive cheat-only detections. Adds the Cheater mark to the local player list." ) )
         ->set_keywords( ASTRAL_XORSTR_STATIC( "cheater detection watchdog local mark" ) );
+
+    static const char *const WATCHDOG_QUALITY[]{
+        ASTRAL_XORSTR_STATIC( "Precision" ),
+        ASTRAL_XORSTR_STATIC( "Performance" ),
+    };
+    watchdog->add< gui::combo_box >( ASTRAL_XORSTR_STATIC( "Quality" ), WATCHDOG_QUALITY,
+                                     config::misc_t::WATCHDOG_QUALITY_COUNT,
+                                     &g_cfg.m_misc.m_watchdog_quality )
+        ->set_render_on( &g_cfg.m_misc.m_watchdog )
+        ->set_tooltip( ASTRAL_XORSTR_STATIC(
+            "Precision uses full player performance samples and checks visible loadouts together. "
+            "Performance uses smaller samples and staggers loadout checks to prevent frame-time spikes." ) );
 
     gui::checkbox *behavior_scanner{ watchdog->add< gui::checkbox >(
         ASTRAL_XORSTR_STATIC( "Behavior scanner" ), &g_cfg.m_misc.m_behavior_scanner ) };

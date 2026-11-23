@@ -601,6 +601,8 @@ public:
     bool is_ignored_player( u32 account );
     void refresh_party( );
     void refresh_lobby_parties( );
+    void invalidate_party_roster( );
+    void service_party_roster( );
 
     static color_t party_color( u8 party );
 
@@ -649,6 +651,7 @@ public:
     usize          m_party_member_count{ };
     lobby_party_t  m_lobby_parties[ MAX_TRACKED_PLAYERS ]{ };
     usize          m_lobby_party_count{ };
+    bool           m_party_roster_dirty{ true };
 };
 
 class hooks

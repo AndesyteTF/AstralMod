@@ -112,6 +112,7 @@ enum class bind_mode_t : u8
     hold,
     toggle,
     always,
+    on_attack,
 };
 
 struct bind_t

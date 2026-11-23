@@ -746,6 +746,7 @@ void ASTRAL_THISCALL hkLevelInitPreEntity( CHLClient *thisptr, const char *map_n
     g_watchdog.clear( );
     g_behavior_scanner.clear( );
     g_player_perf.clear( );
+    g_cl.invalidate_party_roster( );
 
     g_fakelag.reset( );
     g_anti_aim.reset( );
@@ -973,15 +974,23 @@ bool ASTRAL_THISCALL hkFireEventClientSide( IGameEventManager2 *thisptr, IGameEv
 
     if ( event )
     {
-        if ( HASH_RT( event->GetName( ) ) == HASH_CT( "party_chat" ) && g_party_network.on_party_chat( event ) )
+        const auto event_name{ HASH_RT( event->GetName( ) ) };
+        if ( event_name == HASH_CT( "party_chat" ) )
         {
-            thisptr->FreeEvent( event );
-            return false;
+            const i32 type{ event->GetInt( ASTRAL_XORSTR( "type" ).get( ) ) };
+            if ( type == TF_PARTY_CHAT_MEMBER_JOIN || type == TF_PARTY_CHAT_MEMBER_LEAVE )
+            {
+                g_cl.invalidate_party_roster( );
+            }
+            if ( g_party_network.on_party_chat( event ) )
+            {
+                thisptr->FreeEvent( event );
+                return false;
+            }
         }
 
         if ( g_cfg.m_streamer_mode.m_enabled )
         {
-            const auto event_name{ HASH_RT( event->GetName( ) ) };
             switch ( event_name )
             {
                 case HASH_CT( "player_team" ):
@@ -1209,10 +1218,16 @@ void ASTRAL_THISCALL hkCreateTFRagdoll( C_TFRagdoll *thisptr )
 
 void ASTRAL_THISCALL hkClientShutdown( CHLClient *thisptr )
 {
+    // Client shutdown is the last reliable point at which Steam's interfaces and
+    // callback registry are still alive. Stop new feature work first, then release
+    // our HTML browsers/callbacks before Valve tears Steam down in the original
+    // shutdown call. Leaving these registered until process teardown can make
+    // steamclient64 dispatch through stale browser/callback state while exiting.
+    g_cl.m_is_running = false;
     g_script_api.shutdown( );
     g_radio.shutdown( );
+    g_html.shutdown( );
     g_session.shutdown( );
-    g_cl.m_is_running = false;
     if ( !g_entity_cache.shutdown( ) )
     {
         DBGOUT( "entity cache: failed to unregister the listener" );
@@ -1258,6 +1273,7 @@ void ASTRAL_THISCALL hkLevelShutdown( CHLClient *thisptr )
     g_watchdog.clear( );
     g_behavior_scanner.clear( );
     g_player_perf.clear( );
+    g_cl.invalidate_party_roster( );
     g_proj_sim.shutdown( );
     g_tracers.clear( );
     g_medbot.on_level_shutdown( );
@@ -1369,8 +1385,7 @@ void ASTRAL_THISCALL hkFrameStageNotify( CHLClient *thisptr, ClientFrameStage_t 
 
         case FRAME_NET_UPDATE_END:
         {
-            g_cl.refresh_party( );
-            g_cl.refresh_lobby_parties( );
+            g_cl.service_party_roster( );
             g_party_network.think( );
             g_auto_vacc.on_network_update( );
             g_auto_det.on_network_update( );

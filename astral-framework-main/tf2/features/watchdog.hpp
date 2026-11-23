@@ -71,6 +71,7 @@ private:
 
     record_t m_records[ MAX_TRACKED_PLAYERS ]{ };
     double   m_next_probe{ };
+    usize    m_quality{ static_cast< usize >( -1 ) };
 };
 
 extern watchdog g_watchdog;

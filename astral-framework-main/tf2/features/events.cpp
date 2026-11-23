@@ -102,6 +102,7 @@ void game_events::FireGameEvent( IGameEvent *event )
             if ( name == HASH_CT( "player_disconnect" ) )
             {
                 g_player_cloud.on_player_disconnected( index );
+                g_cl.invalidate_party_roster( );
             }
             g_crits.on_player_life_change( index );
             const bool dead{ name == HASH_CT( "player_disconnect" ) ||
@@ -115,6 +116,7 @@ void game_events::FireGameEvent( IGameEvent *event )
         {
             const i32 index{ event->GetInt( ASTRAL_XORSTR( "index" ).get( ) ) + 1 };
             g_player_cloud.on_player_connected( index );
+            g_cl.invalidate_party_roster( );
             g_crits.on_player_life_change( index );
             g_player_data.on_life_change( index );
             break;

@@ -1569,7 +1569,9 @@ bool ragebot::should_run( )
         return false;
     }
 
-    if ( !gui::bind_active( g_cfg.m_ragebot.m_activate_key ) )
+    const bool on_attack{ g_cfg.m_ragebot.m_activate_key.m_mode == bind_mode_t::on_attack };
+    if ( on_attack ? !( g_cl.m_cmd->buttons & IN_ATTACK )
+                   : !gui::bind_active( g_cfg.m_ragebot.m_activate_key ) )
     {
         return false;
     }
@@ -1624,6 +1626,10 @@ bool ragebot::should_run( )
 // TODO: Remove this...
 bool ragebot::holds_aim_key( )
 {
+    if ( g_cfg.m_ragebot.m_activate_key.m_mode == bind_mode_t::on_attack )
+    {
+        return g_cl.m_cmd && ( g_cl.m_cmd->buttons & IN_ATTACK );
+    }
     return gui::bind_active( g_cfg.m_ragebot.m_activate_key );
 }
 
@@ -2223,7 +2229,8 @@ bool ragebot::get_best_target( ragebot_target_t &out )
     }
 
     const double now{ g_tf2.m_engine->Plat_FloatTime( ) };
-    const bool   humanized{ g_cfg.m_ragebot.m_aim_type == config::ragebot_t::AIM_HUMANIZED };
+    const bool   humanized{ g_cfg.m_ragebot.m_aim_type == config::ragebot_t::AIM_HUMANIZED ||
+                            g_cfg.m_ragebot.m_aim_type == config::ragebot_t::AIM_LEGIT };
     const bool   prefer_human_target{ humanized && this->m_human_target != INVALID_EHANDLE_INDEX };
     auto sample_range = [ ]( i32 min_v, i32 max_v ) -> i32
     {
@@ -7020,7 +7027,8 @@ bool ragebot::get_projectile_target( ragebot_target_t &out )
     i32            walked{ };
 
     const double now{ g_tf2.m_engine->Plat_FloatTime( ) };
-    const bool   humanized{ g_cfg.m_ragebot.m_aim_type == config::ragebot_t::AIM_HUMANIZED };
+    const bool   humanized{ g_cfg.m_ragebot.m_aim_type == config::ragebot_t::AIM_HUMANIZED ||
+                            g_cfg.m_ragebot.m_aim_type == config::ragebot_t::AIM_LEGIT };
     const bool   humanized_projectile_tracking{ humanized && !m_weapon_data.m_is_sticky };
     const bool   prefer_human_target{ humanized_projectile_tracking && this->m_human_target != INVALID_EHANDLE_INDEX };
     auto sample_range = [ ]( i32 min_v, i32 max_v ) -> i32
@@ -7881,7 +7889,7 @@ namespace
 
         const f32 amount{ math::clamp( static_cast< f32 >( g_cfg.m_ragebot.m_smooth_curve_amount ) / 100.0f, 0.0f, 2.0f ) };
         shaped = 1.0f - ( 1.0f - shaped ) * amount;
-        if ( aim_type == config::ragebot_t::AIM_HUMANIZED )
+        if ( aim_type == config::ragebot_t::AIM_HUMANIZED || aim_type == config::ragebot_t::AIM_LEGIT )
         {
             shaped = math::clamp( shaped, 0.35f, 1.0f );
         }
@@ -7895,7 +7903,8 @@ namespace
         const f32 distance{ math::sqrt( delta.x * delta.x + delta.y * delta.y ) };
         f32 strength{ static_cast< f32 >( math::clamp( g_cfg.m_ragebot.m_aim_strength, 1, 100 ) ) / 100.0f };
 
-        if ( ( type == config::ragebot_t::AIM_SMOOTH_VELOCITY || type == config::ragebot_t::AIM_HUMANIZED ) && entity )
+        if ( ( type == config::ragebot_t::AIM_SMOOTH_VELOCITY || type == config::ragebot_t::AIM_HUMANIZED ||
+               type == config::ragebot_t::AIM_LEGIT ) && entity )
         {
             const f32 speed_ratio{ math::clamp( entity->GetAbsVelocity( ).length2d( ) / 320.0f, 0.0f, 1.75f ) };
             strength *= math::clamp( 0.65f + speed_ratio * 0.4f, 0.35f, 1.35f );
@@ -7908,16 +7917,21 @@ namespace
         }
 
         if ( type == config::ragebot_t::AIM_SMOOTH || type == config::ragebot_t::AIM_SMOOTH_VELOCITY ||
-             type == config::ragebot_t::AIM_ASSISTIVE || type == config::ragebot_t::AIM_HUMANIZED )
+             type == config::ragebot_t::AIM_ASSISTIVE || type == config::ragebot_t::AIM_HUMANIZED ||
+             type == config::ragebot_t::AIM_LEGIT )
         {
             strength = apply_smooth_curve( strength, distance, type );
         }
 
         if ( type == config::ragebot_t::AIM_LEGIT || type == config::ragebot_t::AIM_HUMANIZED )
         {
+            if ( type == config::ragebot_t::AIM_LEGIT )
+            {
+                strength *= 0.35f;
+            }
             // Bound the angular velocity as well as interpolating so large corrections never snap.
-            const f32 base_step{ type == config::ragebot_t::AIM_HUMANIZED ? 0.12f : 0.15f };
-            const f32 step_scale{ type == config::ragebot_t::AIM_HUMANIZED ? 2.15f : 2.85f };
+            const f32 base_step{ type == config::ragebot_t::AIM_HUMANIZED ? 0.12f : 0.05f };
+            const f32 step_scale{ type == config::ragebot_t::AIM_HUMANIZED ? 2.15f : 0.65f };
             const f32 maximum_step{ base_step + strength * step_scale };
             strength = distance > maximum_step ? maximum_step / distance : 1.0f;
         }
@@ -7951,7 +7965,9 @@ void ragebot::aim_at_target( const ragebot_target_t &tgt )
     const f32 convergence{ math::calc_fov( initial_steered, initial_exact ) };
     const double now{ g_tf2.m_engine->Plat_FloatTime( ) };
 
-    if ( aim_type == config::ragebot_t::AIM_HUMANIZED )
+    const bool human_style{ aim_type == config::ragebot_t::AIM_HUMANIZED ||
+                            aim_type == config::ragebot_t::AIM_LEGIT };
+    if ( human_style )
     {
         auto sample_range = [ ]( i32 min_v, i32 max_v ) -> i32
         {
@@ -7994,10 +8010,10 @@ void ragebot::aim_at_target( const ragebot_target_t &tgt )
     }
 
     bool able_to_fire{ this->should_fire( ) && !g_tickbase.withholds_shot( ) && this->aimable_target_is_kill_condition( tgt ) };
-    const bool human_projectile{ aim_type == config::ragebot_t::AIM_HUMANIZED &&
+    const bool human_projectile{ human_style &&
                                  m_weapon_data.m_weapon_type == weapon_type::projectile_weapon };
     f32 fire_convergence{ 0.35f };
-    if ( aim_type == config::ragebot_t::AIM_HUMANIZED )
+    if ( human_style )
     {
         const i32 proj_tol{ this->m_human_projectile_tolerance_sample > 0
                                 ? this->m_human_projectile_tolerance_sample
@@ -8009,13 +8025,13 @@ void ragebot::aim_at_target( const ragebot_target_t &tgt )
     if ( visible_aim_type( aim_type ) && convergence > fire_convergence )
     {
         able_to_fire = false;
-        if ( aim_type == config::ragebot_t::AIM_HUMANIZED )
+        if ( human_style )
         {
             this->m_human_ready_time = 0.0;
         }
     }
 
-    if ( aim_type == config::ragebot_t::AIM_HUMANIZED )
+    if ( human_style )
     {
         auto sample_range = [ ]( i32 min_v, i32 max_v ) -> i32
         {
@@ -8064,8 +8080,16 @@ void ragebot::aim_at_target( const ragebot_target_t &tgt )
         }
     }
 
+    const bool delay_requested_shot{ g_cfg.m_ragebot.m_activate_key.m_mode == bind_mode_t::on_attack &&
+                                     g_cfg.m_ragebot.m_delay_shot };
+    if ( delay_requested_shot && !able_to_fire )
+    {
+        g_cl.m_cmd->buttons &= ~IN_ATTACK;
+    }
+
     bool humanized_auto_fired{ false };
-    if ( able_to_fire || m_weapon_data.m_should_fire_always_set_attack_bits )
+    if ( ( able_to_fire || m_weapon_data.m_should_fire_always_set_attack_bits ) &&
+         !( delay_requested_shot && !able_to_fire ) )
     {
         if ( g_cfg.m_ragebot.m_auto_shoot )
         {
@@ -8083,7 +8107,7 @@ void ragebot::aim_at_target( const ragebot_target_t &tgt )
                         g_cl.m_cmd->buttons &= ~IN_ATTACK; // this command carries the shot
                         this->m_charge_managed  = false;   // the release ends management, not a guess about why the charge vanished
                         this->m_charge_starting = false;
-                        if ( aim_type == config::ragebot_t::AIM_HUMANIZED )
+                        if ( human_style )
                         {
                             humanized_auto_fired = true;
                         }
@@ -8096,7 +8120,7 @@ void ragebot::aim_at_target( const ragebot_target_t &tgt )
                     this->m_charge_weapon   = g_cl.m_weapon->entindex( );
 
                     this->m_pending_sticky = m_weapon_data.m_is_sticky && this->m_projectile_solved;
-                    if ( aim_type == config::ragebot_t::AIM_HUMANIZED )
+                    if ( human_style )
                     {
                         humanized_auto_fired = true;
                     }
@@ -8104,14 +8128,14 @@ void ragebot::aim_at_target( const ragebot_target_t &tgt )
             } else if ( m_weapon_data.m_fires_on_attack_release && ( g_cl.m_cmd->buttons & IN_ATTACK ) )
             {
                 g_cl.m_cmd->buttons &= ~IN_ATTACK;
-                if ( aim_type == config::ragebot_t::AIM_HUMANIZED )
+                if ( human_style )
                 {
                     humanized_auto_fired = true;
                 }
             } else
             {
                 g_cl.m_cmd->buttons |= IN_ATTACK;
-                if ( aim_type == config::ragebot_t::AIM_HUMANIZED )
+                if ( human_style )
                 {
                     humanized_auto_fired = true;
                 }

@@ -794,6 +794,26 @@ void client::refresh_lobby_parties( )
     }
 }
 
+void client::invalidate_party_roster( )
+{
+    this->m_party_roster_dirty = true;
+}
+
+void client::service_party_roster( )
+{
+    if ( !this->m_party_roster_dirty )
+    {
+        return;
+    }
+
+    // Steam/GC lobby member details are not a per-packet data source. Walking
+    // and sorting the full lobby on every FRAME_NET_UPDATE_END can contend with
+    // the GC during real matches; itemtest has no lobby and therefore hid it.
+    this->m_party_roster_dirty = false;
+    this->refresh_party( );
+    this->refresh_lobby_parties( );
+}
+
 u8 client::party_index( u32 account ) const
 {
     if ( this->is_party_member( account ) )

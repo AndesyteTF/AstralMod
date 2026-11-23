@@ -25,6 +25,10 @@ constexpr i32    OVERFLOW_PACKETS{ 3 };
 constexpr float  OVERFLOW_WEIGHT{ 50.0f };
 constexpr i32    SHIFT_TICKS{ 10 };
 constexpr float  SHIFT_WEIGHT{ 50.0f };
+// Three overflow packets are enough to substantiate this detection. Requesting
+// the full 32-record dump made TF2 build, transmit, and parse a much larger text
+// message for every queued player probe.
+constexpr i32    PROBE_RECORDS{ 8 };
 constexpr double PROBE_INTERVAL{ 3.0 };
 constexpr double PROBE_SPACING{ 1.0 };
 
@@ -43,6 +47,13 @@ constexpr float REGION_WEIGHT{ 50.0f };
 constexpr usize CLOUD_NAME_SLOTS{ 4 };
 static char     s_cloud_names[ CLOUD_NAME_SLOTS ][ 129 ]{ };
 static usize    s_next_cloud_name{ };
+
+static i32 region_phase( i32 index )
+{
+    const i32 period{ math::bigger( TIME_TO_TICKS( REGION_INTERVAL ), 1 ) };
+    const i32 clients{ math::clamp( g_tf2.m_globals->maxClients, 1, MAX_TRACKED_PLAYERS - 1 ) };
+    return ( period * math::clamp( index - 1, 0, clients - 1 ) ) / clients;
+}
 
 ASTRAL_FORCE_INLINE bool short_gap( i32 gap )
 {
@@ -136,6 +147,7 @@ void watchdog::clear( )
     }
 
     this->m_next_probe = 0.0;
+    this->m_quality    = static_cast< usize >( -1 );
 }
 
 const char *watchdog::known_cheater_name( i32 index, u32 account, bool hidden )
@@ -171,6 +183,15 @@ void watchdog::adopt( record_t &record, i32 index, u32 handle )
     record.m_eligible = g_tf2.m_engine->GetPlayerInfo( index, &info ) && info.friendsID &&
                         !info.fakeplayer && !info.ishltv && !info.isreplay;
     record.m_account  = info.friendsID;
+
+    // Equipment-region validation reaches into the item schema and each player's
+    // wearable list. Starting every record at tick zero made every visible player
+    // perform that work in one frame, then repeat the same burst every interval.
+    // Give each slot a stable phase so the checks are spread across the interval.
+    const bool performance{ g_cfg.m_misc.m_watchdog_quality ==
+                            config::misc_t::WATCHDOG_QUALITY_PERFORMANCE };
+    record.m_region_tick = g_tf2.m_cl->m_ClockDriftMgr.m_nServerTick +
+                           ( performance ? region_phase( index ) : 0 );
 }
 
 void watchdog::on_network_update( )
@@ -184,6 +205,17 @@ void watchdog::on_network_update( )
 
     const i32 server_tick{ g_tf2.m_cl->m_ClockDriftMgr.m_nServerTick };
     const i32 local{ g_tf2.m_engine->GetLocalPlayer( ) };
+
+    if ( this->m_quality != g_cfg.m_misc.m_watchdog_quality )
+    {
+        this->m_quality = g_cfg.m_misc.m_watchdog_quality;
+        const bool performance{ this->m_quality == config::misc_t::WATCHDOG_QUALITY_PERFORMANCE };
+        for ( i32 index{ 1 }; index < MAX_TRACKED_PLAYERS; ++index )
+        {
+            this->m_records[ index ].m_region_tick = server_tick +
+                                                     ( performance ? region_phase( index ) : 0 );
+        }
+    }
 
     for ( const auto *cached : g_entity_cache.players( ) )
     {
@@ -343,7 +375,11 @@ void watchdog::probe( )
             continue;
         }
 
-        if ( g_player_perf.request( perf_owner_t::watchdog, index, PERF_MAX_RECORDS ) )
+        const i32 records{ g_cfg.m_misc.m_watchdog_quality ==
+                                   config::misc_t::WATCHDOG_QUALITY_PRECISION
+                               ? PERF_MAX_RECORDS
+                               : PROBE_RECORDS };
+        if ( g_player_perf.request( perf_owner_t::watchdog, index, records ) )
         {
             record.m_probe_wanted = false;
             record.m_probe_time   = now;

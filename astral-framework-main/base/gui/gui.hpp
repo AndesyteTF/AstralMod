@@ -920,9 +920,10 @@ namespace gui
     class keybind : public baseobject
     {
     public:
-        keybind( string_view label, bind_t *bind ) :
+        keybind( string_view label, bind_t *bind, bool allow_on_attack = false ) :
             baseobject{ label },
-            m_bind{ bind }
+            m_bind{ bind },
+            m_allow_on_attack{ allow_on_attack }
         {
         }
 
@@ -959,7 +960,7 @@ namespace gui
         i32     m_revealed{ };
         rect_t  m_popup{ };
 
-        atl::array< row_state_t, 3 > m_rows{ };
+        atl::array< row_state_t, 4 > m_rows{ };
 
         u8   m_listen_pulse{ };
         u8   m_expand_mix{ };
@@ -968,6 +969,7 @@ namespace gui
         bool m_expanded{ };
         bool m_upward{ };
         bool m_tween_ready{ };
+        bool m_allow_on_attack{ };
     };
 
     class slider_int : public baseobject

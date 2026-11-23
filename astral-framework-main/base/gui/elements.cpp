@@ -41,7 +41,8 @@ namespace gui
             keybind *entry{ s_keybind_registry[ index ] };
             bind_t *binding{ entry ? entry->binding( ) : nullptr };
             const bool always{ binding && binding->m_mode == bind_mode_t::always };
-            if ( !binding || ( !include_unbound && !binding->m_key && !( include_always && always ) ) ||
+            const bool on_attack{ binding && binding->m_mode == bind_mode_t::on_attack };
+            if ( !binding || ( !include_unbound && !binding->m_key && !( include_always && always ) && !on_attack ) ||
                  ( always && !include_always ) || entry->name( ).empty( ) )
             {
                 continue;
@@ -378,6 +379,8 @@ namespace gui
                 return ASTRAL_XORSTR_STATIC( "Toggle" );
             case bind_mode_t::always:
                 return ASTRAL_XORSTR_STATIC( "Always" );
+            case bind_mode_t::on_attack:
+                return ASTRAL_XORSTR_STATIC( "On attack" );
             default:
                 return ASTRAL_XORSTR_STATIC( "Hold" );
         }
@@ -388,6 +391,13 @@ namespace gui
         if ( bind.m_mode == bind_mode_t::always )
         {
             return true;
+        }
+
+        // Command-button activation is feature-specific. The ragebot evaluates it where
+        // the current CUserCmd is available; other bind consumers treat it as inactive.
+        if ( bind.m_mode == bind_mode_t::on_attack )
+        {
+            return false;
         }
 
         if ( !bind.m_key )
@@ -458,7 +468,8 @@ namespace gui
 
     i32 keybind::popup_height( ) const
     {
-        return WIDGET_BIND_MODE_COUNT * g_gui.scaled( WIDGET_LIST_ROW_HEIGHT ) + 2;
+        const i32 rows{ WIDGET_BIND_MODE_COUNT + ( this->m_allow_on_attack ? 1 : 0 ) };
+        return rows * g_gui.scaled( WIDGET_LIST_ROW_HEIGHT ) + 2;
     }
 
     void keybind::collapse( )
@@ -600,7 +611,9 @@ namespace gui
                                 this->m_upward ? this->m_popup.bottom
                                                : this->m_popup.top + full };
 
-        for ( usize index{ }; index < this->m_rows.size( ); ++index )
+        const usize mode_count{ static_cast< usize >( WIDGET_BIND_MODE_COUNT +
+                                                      ( this->m_allow_on_attack ? 1 : 0 ) ) };
+        for ( usize index{ }; index < mode_count; ++index )
         {
             const i32 row_top{ full_rect.top + 1 + static_cast< i32 >( index ) * row_height };
             const i32 shown_top{ row_top > this->m_popup.top ? row_top : this->m_popup.top };
@@ -663,6 +676,11 @@ namespace gui
             return ASTRAL_XORSTR_STATIC( "ON" );
         }
 
+        if ( this->m_bind->m_mode == bind_mode_t::on_attack )
+        {
+            return ASTRAL_XORSTR_STATIC( "ATK" );
+        }
+
         return key_name( this->m_bind->m_key );
     }
 
@@ -720,7 +738,8 @@ namespace gui
         if ( this->m_listening )
         {
             text_color = mix_color( CHIP_IDLE_TEXT, g_theme.m_accent, this->m_listen_pulse );
-        } else if ( this->m_bind->m_key || this->m_bind->m_mode == bind_mode_t::always )
+        } else if ( this->m_bind->m_key || this->m_bind->m_mode == bind_mode_t::always ||
+                    this->m_bind->m_mode == bind_mode_t::on_attack )
         {
             text_color = CHIP_ACTIVE_TEXT;
         } else
@@ -760,7 +779,9 @@ namespace gui
 
         g_render.set_clip( this->m_popup );
 
-        for ( usize index{ }; index < this->m_rows.size( ); ++index )
+        const usize mode_count{ static_cast< usize >( WIDGET_BIND_MODE_COUNT +
+                                                      ( this->m_allow_on_attack ? 1 : 0 ) ) };
+        for ( usize index{ }; index < mode_count; ++index )
         {
             const i32    row_top{ full_rect.top + 1 + static_cast< i32 >( index ) * row_height };
             const rect_t row_bounds{ full_rect.left + 1, row_top, full_rect.right - 1,

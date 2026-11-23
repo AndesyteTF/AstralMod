@@ -714,7 +714,16 @@ public:
         point_t m_astral_sense_performance_position{ 1044, 570 };
         point_t m_seed_indicator_position{ 12, 183 };
         bool    m_party_network{ false };
+
+        enum : usize
+        {
+            WATCHDOG_QUALITY_PRECISION,
+            WATCHDOG_QUALITY_PERFORMANCE,
+            WATCHDOG_QUALITY_COUNT,
+        };
+
         bool    m_watchdog{ true };
+        usize   m_watchdog_quality{ WATCHDOG_QUALITY_PERFORMANCE };
         bool    m_watchdog_notify_party{ true };
         bool    m_behavior_scanner{ false };
         bool    m_crash_reports{ false };
@@ -1319,6 +1328,7 @@ public:
         i32     m_fov{ 180 };
         bool    m_draw_fov{ true };
         bool    m_auto_shoot{ true };
+        bool    m_delay_shot{ false };
         bool    m_allow_aim_in_ui{ false };
         bool    m_manual_backtrack{ false };
         bool    m_backtrack_crosshair{ false };

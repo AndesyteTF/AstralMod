@@ -331,6 +331,7 @@ bool valid_config( config &value )
          value.m_misc.m_menu_particles >= gui::MENU_PARTICLES_COUNT || value.m_misc.m_auto_strafe_mode >= 2 ||
          value.m_misc.m_projectile_camera_mode >= config::PROJECTILE_CAMERA_COUNT ||
          value.m_misc.m_projectile_camera_hud >= config::PROJECTILE_CAMERA_HUD_COUNT ||
+         value.m_misc.m_watchdog_quality >= config::misc_t::WATCHDOG_QUALITY_COUNT ||
          value.m_rjump.m_priority >= config::RJUMP_PRIORITY_COUNT ||
          value.m_ragebot.m_projectile_path_style >= config::PATH_STYLE_COUNT ||
          value.m_ragebot.m_projectile_path_bounds_style >= config::PATH_BOUNDS_COUNT ||
