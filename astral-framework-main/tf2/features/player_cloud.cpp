@@ -1227,76 +1227,141 @@ player_cloud::report_result_t player_cloud::submit_report( u32 account, string_v
 
 #endif
 
-void player_cloud::scan_players( )
+bool player_cloud::scan_player( i32 index )
 {
     const i32 local{ g_tf2.m_engine->GetLocalPlayer( ) };
-    const i32 maximum{ math::smaller( g_tf2.m_engine->GetMaxClients( ),
-                                      MAX_TRACKED_PLAYERS - 1 ) };
-    for ( i32 index{ 1 }; index <= maximum; ++index )
+    player_info_t info{ };
+    if ( index == local )
     {
-        player_info_t info{ };
-        if ( index == local || !g_tf2.m_engine->GetPlayerInfo( index, &info ) ||
-             !info.friendsID || info.fakeplayer || info.ishltv || info.isreplay )
+        return true;
+    }
+
+    if ( !g_tf2.m_engine->GetPlayerInfo( index, &info ) || !info.friendsID )
+    {
+        // player_connect_client can arrive before the player-info slot is ready.
+        // Keep this one slot pending instead of falling back to a roster scan.
+        return false;
+    }
+
+    if ( info.fakeplayer || info.ishltv || info.isreplay )
+    {
+        this->m_notified[ index ]         = 0;
+        this->m_integration_seen[ index ] = 0;
+        return true;
+    }
+
+    if ( this->m_integration_seen[ index ] != info.friendsID )
+    {
+        if ( this->m_steam_key[ 0 ] || this->m_steam_history_key[ 0 ] )
         {
-            this->m_notified[ index ]         = 0;
-            this->m_integration_seen[ index ] = 0;
-            continue;
+            if ( !this->queue_integration( info.friendsID, string_view{ info.name } ) )
+            {
+                return false;
+            }
         }
+        this->m_integration_seen[ index ] = info.friendsID;
+    }
 
-        if ( this->m_integration_seen[ index ] != info.friendsID &&
-             this->queue_integration( info.friendsID, string_view{ info.name } ) )
-        {
-            this->m_integration_seen[ index ] = info.friendsID;
-        }
+    char cloud_alias[ 129 ]{ };
+    if ( !this->known( info.friendsID, cloud_alias ) )
+    {
+        this->m_notified[ index ] = 0;
+        return true;
+    }
 
-        char cloud_alias[ 129 ]{ };
-        if ( !this->known( info.friendsID, cloud_alias ) )
-        {
-            this->m_notified[ index ] = 0;
-            continue;
-        }
+    if ( this->m_notified[ index ] == info.friendsID )
+    {
+        return true;
+    }
 
-        if ( this->m_notified[ index ] == info.friendsID )
-        {
-            continue;
-        }
+    this->m_notified[ index ] = info.friendsID;
 
-        this->m_notified[ index ] = info.friendsID;
+    const bool  hidden{ g_streamer_mode.should_hide_player( index ) };
+    const char *name{ hidden ? g_streamer_mode.get_ideal_player_name( index ) : info.name };
+    const char *alias{ hidden ? nullptr : g_cfg.player_alias( info.friendsID ) };
+    if ( !alias && !hidden && cloud_alias[ 0 ] )
+    {
+        alias = cloud_alias;
+    }
 
-        const bool  hidden{ g_streamer_mode.should_hide_player( index ) };
-        const char *name{ hidden ? g_streamer_mode.get_ideal_player_name( index ) : info.name };
-        const char *alias{ hidden ? nullptr : g_cfg.player_alias( info.friendsID ) };
-        if ( !alias && !hidden && cloud_alias[ 0 ] )
-        {
-            alias = cloud_alias;
-        }
+    char message[ 512 ]{ };
+    if ( alias )
+    {
+        str::format_to( message, sizeof( message ), ASTRAL_XORSTR( "The player \"{}\" is a known cheater and is commonly referred to as \"{}\"." ).get( ), name, alias );
+    } else
+    {
+        str::format_to( message, sizeof( message ), ASTRAL_XORSTR( "The player \"{}\" is a known cheater." ).get( ), name );
+    }
 
-        // NOTE: WE SHOULD HANDLE THIS IN A BETTER WAY.
-        //FWork - probably will later
-        char message[ 512 ]{ };
+    push_notification( notify_kind_t::warning, ICON_BAN, name, message );
+
+    if ( g_cfg.m_misc.m_watchdog_notify_party )
+    {
         if ( alias )
         {
-            str::format_to( message, sizeof( message ), ASTRAL_XORSTR( "The player \"{}\" is a known cheater and is commonly referred to as \"{}\"." ).get( ), name, alias );
+            str::format_to( message, sizeof( message ), ASTRAL_XORSTR( "[AstralMod] The player \"{}\" is a known cheater and is commonly referred to as \"{}\"." ).get( ), info.name, alias );
         } else
         {
-            str::format_to( message, sizeof( message ), ASTRAL_XORSTR( "The player \"{}\" is a known cheater." ).get( ), name );
+            str::format_to( message, sizeof( message ), ASTRAL_XORSTR( "[AstralMod] The player \"{}\" is a known cheater." ).get( ), info.name );
         }
 
-        push_notification( notify_kind_t::warning, ICON_BAN, name, message );
+        TFPartyClient( )->SendPartyChat( message );
+    }
 
-        if ( g_cfg.m_misc.m_watchdog_notify_party )
+    return true;
+}
+
+static i32 player_list_slot_limit( )
+{
+    C_TFGameRules *rules{ TFGameRules( ) };
+    return rules && rules->m_nMatchGroupType( ) != k_eTFMatchGroup_Invalid
+               ? 24
+               : MAX_TRACKED_PLAYERS - 1;
+}
+
+void player_cloud::scan_players( )
+{
+    const i32 maximum{ math::smaller( g_tf2.m_engine->GetMaxClients( ),
+                                      player_list_slot_limit( ) ) };
+    for ( i32 index{ 1 }; index <= maximum; ++index )
+    {
+        this->scan_player( index );
+    }
+}
+
+void player_cloud::scan_pending_players( )
+{
+    for ( i32 index{ 1 }; index < MAX_TRACKED_PLAYERS; ++index )
+    {
+        if ( !this->m_pending_players[ index ] )
         {
-            if ( alias )
-            {
-                str::format_to( message, sizeof( message ), ASTRAL_XORSTR( "[AstralMod] The player \"{}\" is a known cheater and is commonly referred to as \"{}\"." ).get( ), info.name, alias );
-            } else
-            {
-                str::format_to( message, sizeof( message ), ASTRAL_XORSTR( "[AstralMod] The player \"{}\" is a known cheater." ).get( ), info.name );
-            }
-
-            TFPartyClient( )->SendPartyChat( message );
+            continue;
+        }
+        if ( this->scan_player( index ) )
+        {
+            this->m_pending_players[ index ] = false;
         }
     }
+}
+
+void player_cloud::on_player_connected( i32 index )
+{
+    if ( index > 0 && index < MAX_TRACKED_PLAYERS &&
+         index <= player_list_slot_limit( ) )
+    {
+        this->m_pending_players[ index ] = true;
+    }
+}
+
+void player_cloud::on_player_disconnected( i32 index )
+{
+    if ( index <= 0 || index >= MAX_TRACKED_PLAYERS )
+    {
+        return;
+    }
+    this->m_pending_players[ index ] = false;
+    this->m_notified[ index ]         = 0;
+    this->m_integration_seen[ index ] = 0;
 }
 
 bool player_cloud::access_allowed( )
@@ -1370,7 +1435,6 @@ void player_cloud::poll( )
     {
         return;
     }
-    const u64 now{ I( GetTickCount64 )( ) };
     if ( _InterlockedCompareExchange( &this->m_state, 2, 2 ) == 2 )
     {
         if ( this->m_operation == operation_t::list )
@@ -1403,11 +1467,6 @@ void player_cloud::poll( )
         this->m_list_started = true;
         this->start( operation_t::list );
     }
-    if ( now < this->m_next_scan )
-    {
-        return;
-    }
-    this->m_next_scan = now + 1000;
     if ( !g_tf2.m_engine->IsInGame( ) )
     {
         if ( this->m_in_game )
@@ -1417,6 +1476,7 @@ void player_cloud::poll( )
                 account = 0;
             }
         }
+        for ( bool &pending : this->m_pending_players ) pending = false;
         this->m_in_game = false;
     } else
     {
@@ -1428,9 +1488,11 @@ void player_cloud::poll( )
             }
             for ( u32 &account : this->m_integration_seen ) account = 0;
             this->queue_integrations( );
+            this->scan_players( );
+            for ( bool &pending : this->m_pending_players ) pending = false;
             this->m_in_game = true;
         }
-        this->scan_players( );
+        this->scan_pending_players( );
     }
 }
 
@@ -1446,7 +1508,6 @@ void player_cloud::poll( )
     {
         return;
     }
-    const u64 now{ I( GetTickCount64 )( ) };
     if ( _InterlockedCompareExchange( &this->m_state, 2, 2 ) == 2 )
     {
         if ( this->m_operation == operation_t::list )
@@ -1489,11 +1550,6 @@ void player_cloud::poll( )
         this->m_list_started = true;
         this->start( operation_t::list );
     }
-    if ( now < this->m_next_scan )
-    {
-        return;
-    }
-    this->m_next_scan = now + 1000;
     if ( !g_tf2.m_engine->IsInGame( ) )
     {
         if ( this->m_in_game )
@@ -1503,6 +1559,7 @@ void player_cloud::poll( )
                 account = 0;
             }
         }
+        for ( bool &pending : this->m_pending_players ) pending = false;
         this->m_in_game = false;
     } else
     {
@@ -1514,9 +1571,11 @@ void player_cloud::poll( )
             }
             for ( u32 &account : this->m_integration_seen ) account = 0;
             this->queue_integrations( );
+            this->scan_players( );
+            for ( bool &pending : this->m_pending_players ) pending = false;
             this->m_in_game = true;
         }
-        this->scan_players( );
+        this->scan_pending_players( );
     }
 }
 
@@ -1536,6 +1595,6 @@ void player_cloud::on_level_shutdown( )
         atl::scoped_lock lock{ this->m_publish };
         this->m_integrated.clear( );
     }
-    this->m_in_game   = false;
-    this->m_next_scan = 0;
+    this->m_in_game = false;
+    for ( bool &pending : this->m_pending_players ) pending = false;
 }

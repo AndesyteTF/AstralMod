@@ -812,6 +812,54 @@ u8 client::party_index( u32 account ) const
     return 0;
 }
 
+usize client::mark_party_suspected( u32 account )
+{
+    const u8 party{ this->party_index( account ) };
+    if ( !account || !party )
+    {
+        return 0;
+    }
+
+    usize marked{ };
+    const auto mark{ [ & ]( u32 member )
+    {
+        if ( !member || member == account )
+        {
+            return;
+        }
+
+        const u32 marks{ g_cfg.player_marks( member ) };
+        if ( marks & ( config::PLAYER_MARK_CHEATER |
+                       config::PLAYER_MARK_SUSPECTED_CHEATER ) )
+        {
+            return;
+        }
+
+        marked += g_cfg.set_player_marks(
+            member, marks | config::PLAYER_MARK_SUSPECTED_CHEATER );
+    } };
+
+    if ( party == 1 )
+    {
+        for ( usize index{ }; index < this->m_party_member_count; ++index )
+        {
+            mark( this->m_party_members[ index ] );
+        }
+        return marked;
+    }
+
+    for ( usize index{ }; index < this->m_lobby_party_count; ++index )
+    {
+        const lobby_party_t &member{ this->m_lobby_parties[ index ] };
+        if ( member.m_party == party )
+        {
+            mark( member.m_account );
+        }
+    }
+
+    return marked;
+}
+
 color_t client::party_color( u8 party )
 {
     if ( party == 1 )

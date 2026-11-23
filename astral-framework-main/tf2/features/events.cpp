@@ -8,6 +8,7 @@
 #include "hitmarker.hpp"
 #include "misc.hpp"
 #include "player_data.hpp"
+#include "player_cloud.hpp"
 #include "resolver.hpp"
 
 ASTRAL_NO_DESTROY game_events g_events{ };
@@ -98,6 +99,10 @@ void game_events::FireGameEvent( IGameEvent *event )
         case HASH_CT( "player_disconnect" ):
         {
             const i32 index{ g_tf2.m_engine->GetPlayerForUserID( event->GetInt( ASTRAL_XORSTR( "userid" ).get( ) ) ) };
+            if ( name == HASH_CT( "player_disconnect" ) )
+            {
+                g_player_cloud.on_player_disconnected( index );
+            }
             g_crits.on_player_life_change( index );
             const bool dead{ name == HASH_CT( "player_disconnect" ) ||
                              ( name == HASH_CT( "player_death" ) &&
@@ -109,6 +114,7 @@ void game_events::FireGameEvent( IGameEvent *event )
         case HASH_CT( "player_connect_client" ):
         {
             const i32 index{ event->GetInt( ASTRAL_XORSTR( "index" ).get( ) ) + 1 };
+            g_player_cloud.on_player_connected( index );
             g_crits.on_player_life_change( index );
             g_player_data.on_life_change( index );
             break;

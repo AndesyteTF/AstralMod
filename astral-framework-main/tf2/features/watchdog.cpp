@@ -457,6 +457,7 @@ void watchdog::flag( record_t &record, i32 index, detection_t detection )
     // Watchdog detections are the conclusive tier. Persist them locally first;
     // cloud reporting is optional infrastructure and must never gate the mark.
     g_cfg.set_player_marks( record.m_account, marks | config::PLAYER_MARK_CHEATER );
+    g_cl.mark_party_suspected( record.m_account );
 
     str::copy( record.m_name, sizeof( record.m_name ), info.name );
     record.m_report_pending = !g_player_cloud.known( record.m_account, cloud_alias );

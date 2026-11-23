@@ -32,6 +32,8 @@ public:
 
     void poll( );
     void on_level_shutdown( );
+    void on_player_connected( i32 index );
+    void on_player_disconnected( i32 index );
     bool known( u32 account, char ( &alias )[ 129 ] ) const;
     u32 marks( u32 account, char ( &alias )[ 129 ] ) const;
     bool remove_mark( u32 account, u32 mark );
@@ -74,7 +76,9 @@ private:
     bool parse_integrations( );
     void queue_integrations( );
     bool queue_integration( u32 account, string_view name );
+    bool scan_player( i32 index );
     void scan_players( );
+    void scan_pending_players( );
     bool local_save( ) const; // caller must hold m_publish
     bool access_allowed( );
 
@@ -92,7 +96,7 @@ private:
     u32                    m_status{ };
     u32                    m_notified[ MAX_TRACKED_PLAYERS ]{ };
     u32                    m_integration_seen[ MAX_TRACKED_PLAYERS ]{ };
-    u64                    m_next_scan{ };
+    bool                   m_pending_players[ MAX_TRACKED_PLAYERS ]{ };
     operation_t            m_operation{ operation_t::list };
     bool                   m_success{ };
     bool                   m_loaded{ };

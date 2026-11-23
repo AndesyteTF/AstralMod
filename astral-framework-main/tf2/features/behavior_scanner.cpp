@@ -175,6 +175,8 @@ void behavior_scanner::flag( record_t &record, i32 index, const char *reason )
         return;
     }
 
+    g_cl.mark_party_suspected( record.m_account );
+
     record.m_flagged = true;
     char message[ 128 ]{ };
     str::format_to( message, sizeof( message ), ASTRAL_XORSTR( "Behavior Scanner: {}" ).get( ), reason );

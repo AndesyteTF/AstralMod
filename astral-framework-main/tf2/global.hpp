@@ -597,6 +597,7 @@ public:
     bool is_astral_user( C_TFPlayer *player ) const;
     bool is_party_member( u32 account ) const;
     u8   party_index( u32 account ) const;
+    usize mark_party_suspected( u32 account );
     bool is_ignored_player( u32 account );
     void refresh_party( );
     void refresh_lobby_parties( );

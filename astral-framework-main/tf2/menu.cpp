@@ -3128,6 +3128,41 @@ PLAYER_MARK_CALLBACK( toggle_mark_ulist, config::PLAYER_MARK_ULISTUSER )
 PLAYER_MARK_CALLBACK( toggle_mark_zoophile, config::PLAYER_MARK_ZOOPHILE_ZOOJOKES )
 #undef PLAYER_MARK_CALLBACK
 
+static void mark_selected_cheater_and_party( )
+{
+    const player_list_row_t *player{ selected_player( ) };
+    if ( !player )
+    {
+        return;
+    }
+
+    const u32 marks{ g_cfg.player_marks( player->m_account ) };
+    const bool saved{ g_cfg.set_player_marks(
+        player->m_account, marks | config::PLAYER_MARK_CHEATER ) };
+    const usize associates{ saved ? g_cl.mark_party_suspected( player->m_account ) : 0 };
+
+    char message[ 96 ]{ };
+    if ( saved )
+    {
+        if ( associates == 1 )
+        {
+            str::copy( message, sizeof( message ),
+                       ASTRAL_XORSTR_STATIC( "Cheater marked; 1 party member marked suspected" ) );
+        } else
+        {
+            str::format_to( message, sizeof( message ),
+                            ASTRAL_XORSTR( "Cheater marked; {} party members marked suspected" ).get( ),
+                            associates );
+        }
+    }
+
+    push_notification( saved ? notify_kind_t::success : notify_kind_t::warning,
+                       ICON_BAN, ASTRAL_XORSTR_STATIC( "Player mark" ),
+                       saved ? message : ASTRAL_XORSTR_STATIC( "Could not update player marks" ) );
+    refresh_player_list( );
+    g_gui.invalidate_layout( );
+}
+
 static bool has_selected_group( )
 {
     return s_selected_group < config::PLAYER_GROUP_COUNT;
@@ -4556,6 +4591,10 @@ static void build_player_list( )
     player->add< gui::button >( ASTRAL_XORSTR_STATIC( "Toggle spectate" ),
                                 &toggle_selected_spectate )
         ->set_tooltip( ASTRAL_XORSTR_STATIC( "Locally spectates the selected player while alive or dead." ) );
+    player->add< gui::button >( ASTRAL_XORSTR_STATIC( "Mark cheater and party" ),
+                                &mark_selected_cheater_and_party )
+        ->set_tooltip( ASTRAL_XORSTR_STATIC(
+            "Marks the selected player as Cheater and their detected party members as Suspected cheater." ) );
     player->add< gui::checkbox >( ASTRAL_XORSTR_STATIC( "Spectate in third person" ),
                                   &g_cfg.m_misc.m_enhanced_spectate_thirdperson );
 
