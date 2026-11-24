@@ -35,20 +35,12 @@ else ()
     message(FATAL_ERROR "You are using an unsupported compiler. Please install clang-cl from your preferred source.")
 endif ()
 
-set(ASTRAL_GIT_COMMIT_HASH "UNK")
 set(ASTRAL_GIT_COMMIT_AUTHOR "UNK")
+string(TIMESTAMP ASTRAL_BUILD_DATE "%Y-%m-%d")
 
 find_package(Git)
 if (GIT_FOUND)
     message(STATUS "Git found!")
-    # Fetch git commit hash.
-    execute_process(
-        COMMAND git rev-parse --short HEAD
-        WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
-        OUTPUT_VARIABLE ASTRAL_GIT_COMMIT_HASH
-        OUTPUT_STRIP_TRAILING_WHITESPACE
-    )
-
     # Fetch git commit author.
     execute_process(
         COMMAND git show -s --format=%an
@@ -60,7 +52,7 @@ else ()
     message(STATUS "Git was not found! Certain information will not be available...")
 endif ()
 
-message(STATUS "Git hash: ${ASTRAL_GIT_COMMIT_HASH}")
+message(STATUS "Build date: ${ASTRAL_BUILD_DATE}")
 message(STATUS "Git author: ${ASTRAL_GIT_COMMIT_AUTHOR}")
 
 add_library(astral_options INTERFACE)
@@ -79,7 +71,7 @@ if (CMAKE_BUILD_TYPE STREQUAL "Debug")
         _HAS_EXCEPTIONS=0
         NOMINMAX
         WIN32_LEAN_AND_MEAN
-        CUR_COMMIT_HASH="${ASTRAL_GIT_COMMIT_HASH}"
+        CUR_BUILD_DATE="${ASTRAL_BUILD_DATE}"
         CUR_COMMIT_AUTHOR="${ASTRAL_GIT_COMMIT_AUTHOR}"
         ASTRAL_DEV
         ASTRAL_DISABLE_CLOUD
@@ -92,7 +84,7 @@ elseif(CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
         _HAS_EXCEPTIONS=0
         NOMINMAX
         WIN32_LEAN_AND_MEAN
-        CUR_COMMIT_HASH="${ASTRAL_GIT_COMMIT_HASH}"
+        CUR_BUILD_DATE="${ASTRAL_BUILD_DATE}"
         CUR_COMMIT_AUTHOR="${ASTRAL_GIT_COMMIT_AUTHOR}"
         ASTRAL_DISABLE_CLOUD
     )
@@ -104,7 +96,7 @@ else ()
         _HAS_EXCEPTIONS=0
         NOMINMAX
         WIN32_LEAN_AND_MEAN
-        CUR_COMMIT_HASH="${ASTRAL_GIT_COMMIT_HASH}"
+        CUR_BUILD_DATE="${ASTRAL_BUILD_DATE}"
         CUR_COMMIT_AUTHOR="${ASTRAL_GIT_COMMIT_AUTHOR}"
     )
     message(STATUS "Compiling in shipping mode. All realtime protections and cloud integration will be enabled!")

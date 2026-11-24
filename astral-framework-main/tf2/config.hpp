@@ -1283,6 +1283,13 @@ public:
 
     struct ragebot_t
     {
+        struct aim_override_t
+        {
+            bool  m_enabled{ false };
+            usize m_aim_type{ 2 };
+            i32   m_fov{ 180 };
+        };
+
         enum : usize
         {
             AIM_PLAIN = 0,
@@ -1326,8 +1333,17 @@ public:
         usize   m_smooth_curve{ SMOOTH_CURVE_LINEAR };
         i32     m_smooth_curve_amount{ 100 };
         i32     m_fov{ 180 };
+        aim_override_t m_class_aim_overrides[ CFG_PROFILE_COUNT ]{ };
+        aim_override_t m_projectile_aim_override{ };
         bool    m_draw_fov{ true };
         bool    m_auto_shoot{ true };
+        bool    m_projectile_trigger{ false };
+        bind_t  m_projectile_trigger_key{ };
+        i32     m_projectile_trigger_radius{ 48 };
+        i32     m_projectile_trigger_delay_min{ 20 };
+        i32     m_projectile_trigger_delay_max{ 80 };
+        color_t m_projectile_trigger_color{ 255, 255, 255, 150 };
+        color_t m_projectile_trigger_active_color{ 120, 255, 160, 230 };
         bool    m_delay_shot{ false };
         bool    m_allow_aim_in_ui{ false };
         bool    m_manual_backtrack{ false };
@@ -1391,13 +1407,21 @@ public:
         enum : usize
         {
             AIM_PLAIN = 0,
+            AIM_SMOOTH,
             AIM_SILENT,
+            AIM_LOCKING,
+            AIM_ASSISTIVE,
+            AIM_LEGIT,
+            AIM_SMOOTH_VELOCITY,
+            AIM_HUMANIZED,
             AIM_TYPE_COUNT,
         };
 
         bool   m_enabled{ false };
         bind_t m_activate_key{ VK_XBUTTON1 };
         usize  m_aim_type{ AIM_SILENT };
+        bool   m_trigger{ false };
+        bind_t m_trigger_key{ };
         bool   m_auto_swing{ true };
         bool   m_auto_backstab{ false };
         bool   m_swing_prediction{ true };

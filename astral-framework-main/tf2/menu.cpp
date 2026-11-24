@@ -679,6 +679,23 @@ MAKE_PREDICATES( is_projectile_eligible, RAGEBOT_PROJECTILE_PREDICATES );
 MAKE_PREDICATES( is_hitscan_eligible, RAGEBOT_HITSCAN_PREDICATES );
 
 template< usize tgt >
+static bool is_class_override_being_edited( )
+{
+    return is_able_to_configure_ragebot_option( ) && is_class_being_edited( tgt );
+}
+
+MAKE_PREDICATES( is_class_override_being_edited, RAGEBOT_CLASS_OVERRIDE_PREDICATES );
+
+template< usize tgt >
+static bool is_class_override_enabled( )
+{
+    return is_class_override_being_edited< tgt >( ) &&
+           g_cfg.m_ragebot.m_class_aim_overrides[ tgt ].m_enabled;
+}
+
+MAKE_PREDICATES( is_class_override_enabled, RAGEBOT_CLASS_OVERRIDE_ENABLED_PREDICATES );
+
+template< usize tgt >
 static bool can_mp( )
 {
     return is_hitscan_eligible< tgt >( ) && g_cfg.m_ragebot.m_hitscan_profiles[ tgt ].m_hitscan_multipoint;
@@ -1010,6 +1027,42 @@ static void build_ragebot_visuals( gui::sub_tab *visuals )
         ->set_render_on( &shot_path_shown );
 }
 
+static void build_hitscan_trigger( gui::group_box *trigger )
+{
+    static const char *const TARGETS[]{
+        ASTRAL_XORSTR_STATIC( "Players" ), ASTRAL_XORSTR_STATIC( "Sentry guns" ),
+        ASTRAL_XORSTR_STATIC( "Dispensers" ), ASTRAL_XORSTR_STATIC( "Teleporters" ),
+    };
+    static const char *const IGNORES[]{
+        ASTRAL_XORSTR_STATIC( "Cloaked" ), ASTRAL_XORSTR_STATIC( "Disguised" ),
+        ASTRAL_XORSTR_STATIC( "Feigned" ), ASTRAL_XORSTR_STATIC( "Ubered" ),
+        ASTRAL_XORSTR_STATIC( "Bonked" ), ASTRAL_XORSTR_STATIC( "Taunting" ),
+        ASTRAL_XORSTR_STATIC( "Vaccinator" ), ASTRAL_XORSTR_STATIC( "Friends" ),
+        ASTRAL_XORSTR_STATIC( "Astral users" ), ASTRAL_XORSTR_STATIC( "Party members" ),
+    };
+    static const char *const HITBOXES[]{
+        ASTRAL_XORSTR_STATIC( "Pelvis" ), ASTRAL_XORSTR_STATIC( "Stomach" ),
+        ASTRAL_XORSTR_STATIC( "Lower chest" ), ASTRAL_XORSTR_STATIC( "Chest" ),
+        ASTRAL_XORSTR_STATIC( "Upper chest" ), ASTRAL_XORSTR_STATIC( "Head" ),
+        ASTRAL_XORSTR_STATIC( "Arms" ), ASTRAL_XORSTR_STATIC( "Legs" ),
+    };
+
+    auto enabled{ trigger->add< gui::checkbox >( ASTRAL_XORSTR_STATIC( "Enabled" ), &g_cfg.m_triggerbot.m_enabled ) };
+    auto targets{ trigger->add< gui::combo_box >( ASTRAL_XORSTR_STATIC( "Targets" ), TARGETS, 4,
+                                                   g_cfg.m_triggerbot.m_targets ) };
+    auto hitboxes{ trigger->add< gui::combo_box >( ASTRAL_XORSTR_STATIC( "Hitboxes" ), HITBOXES,
+                                                    config::HITSCAN_COUNT, g_cfg.m_triggerbot.m_hitboxes ) };
+    auto ignores{ trigger->add< gui::combo_box >( ASTRAL_XORSTR_STATIC( "Ignore filters" ), IGNORES,
+                                                   config::IGNORE_COUNT, g_cfg.m_triggerbot.m_ignores ) };
+
+    enabled->add_module< gui::keybind >( string_view{ }, &g_cfg.m_triggerbot.m_key );
+    enabled->set_tooltip( ASTRAL_XORSTR_STATIC( "Fires the moment the crosshair covers a valid hitscan target. With no key bound it runs constantly." ) )
+        ->set_keywords( ASTRAL_XORSTR_STATIC( "triggerbot hitscan trigger auto shoot fire click" ) );
+    targets->set_render_on( &g_cfg.m_triggerbot.m_enabled );
+    hitboxes->set_render_on( &g_cfg.m_triggerbot.m_enabled );
+    ignores->set_render_on( &g_cfg.m_triggerbot.m_enabled );
+}
+
 static void build_ragebot( )
 {
     static const char *const CONFIG_CLASSES[]{
@@ -1097,8 +1150,10 @@ static void build_ragebot( )
         ASTRAL_XORSTR_STATIC( "Inherit" ),
     };
     static const char *const MELEE_AIM_TYPES[]{
-        ASTRAL_XORSTR_STATIC( "Plain" ),
-        ASTRAL_XORSTR_STATIC( "Silent" ),
+        ASTRAL_XORSTR_STATIC( "Plain" ), ASTRAL_XORSTR_STATIC( "Smooth" ),
+        ASTRAL_XORSTR_STATIC( "Silent" ), ASTRAL_XORSTR_STATIC( "Locking" ),
+        ASTRAL_XORSTR_STATIC( "Assistive" ), ASTRAL_XORSTR_STATIC( "Legit" ),
+        ASTRAL_XORSTR_STATIC( "Smooth velocity" ), ASTRAL_XORSTR_STATIC( "Humanized" ),
     };
 
     static const char *const SMOOTH_CURVES[]{
@@ -1160,6 +1215,8 @@ static void build_ragebot( )
     auto global{ general->add_group( ICON_CROSSHAIR, ASTRAL_XORSTR_STATIC( "Global" ), gui::column_t::left ) };
     auto melee{ general->add_group( ICON_CROSSHAIR, ASTRAL_XORSTR_STATIC( "Melee (Global)" ), gui::column_t::left ) };
     auto conditional_aim{ general->add_group( ICON_EYE, ASTRAL_XORSTR_STATIC( "Conditional aim types" ), gui::column_t::right ) };
+    auto hitscan_trigger{ general->add_group( ICON_CROSSHAIR, ASTRAL_XORSTR_STATIC( "Hitscan Trigger" ), gui::column_t::right ) };
+    build_hitscan_trigger( hitscan_trigger );
 
     auto aim_rings{ conditional_aim->add< gui::checkbox >( ASTRAL_XORSTR_STATIC( "Enable Rings" ),
                                                             &g_cfg.m_ragebot.m_aim_rings ) };
@@ -1238,6 +1295,23 @@ static void build_ragebot( )
     auto auto_shoot{ global->add< gui::checkbox >( ASTRAL_XORSTR_STATIC( "Auto-shoot" ), &g_cfg.m_ragebot.m_auto_shoot ) };
     auto_shoot->set_tooltip( ASTRAL_XORSTR_STATIC( "Let the ragebot automatically shoot when a target is found and states are optimal." ) );
     SET_ELEMENT( auto_shoot );
+
+    auto projectile_trigger{ global->add< gui::checkbox >( ASTRAL_XORSTR_STATIC( "Projectile trigger" ), &g_cfg.m_ragebot.m_projectile_trigger ) };
+    projectile_trigger->add_module< gui::keybind >( atl::string_view{ }, &g_cfg.m_ragebot.m_projectile_trigger_key );
+    projectile_trigger->set_tooltip( ASTRAL_XORSTR_STATIC( "Runs projectile prediction without steering your aim. Fires after the predicted aim point remains inside the trigger circle for the configured delay." ) );
+
+    auto projectile_trigger_radius{ global->add< gui::slider_int >( ASTRAL_XORSTR_STATIC( "Trigger circle size" ), &g_cfg.m_ragebot.m_projectile_trigger_radius, 4, 240, ASTRAL_XORSTR_STATIC( "px" ) ) };
+    projectile_trigger_radius->set_render_on( &g_cfg.m_ragebot.m_projectile_trigger );
+
+    auto projectile_trigger_delay{ global->add< gui::slider_range_int >( ASTRAL_XORSTR_STATIC( "Trigger delay" ),
+        &g_cfg.m_ragebot.m_projectile_trigger_delay_min, &g_cfg.m_ragebot.m_projectile_trigger_delay_max, 0, 1000, ASTRAL_XORSTR_STATIC( "ms" ) ) };
+    projectile_trigger_delay->set_render_on( &g_cfg.m_ragebot.m_projectile_trigger );
+
+    auto projectile_trigger_color{ global->add< gui::color_picker >( ASTRAL_XORSTR_STATIC( "Trigger circle" ), &g_cfg.m_ragebot.m_projectile_trigger_color ) };
+    projectile_trigger_color->set_render_on( &g_cfg.m_ragebot.m_projectile_trigger );
+
+    auto projectile_trigger_active_color{ global->add< gui::color_picker >( ASTRAL_XORSTR_STATIC( "Trigger active" ), &g_cfg.m_ragebot.m_projectile_trigger_active_color ) };
+    projectile_trigger_active_color->set_render_on( &g_cfg.m_ragebot.m_projectile_trigger );
 
     static const auto ragebot_on_attack = ( bool ( * )( ) )( [ ]
     {
@@ -1363,6 +1437,29 @@ static void build_ragebot( )
     fov->set_tooltip( ASTRAL_XORSTR_STATIC( "Dictates how many degrees the ragebot can scan for targets within. Setting to 180 disables all restrictions." ) );
     SET_ELEMENT( fov );
 
+    for ( usize i{ }; i < config::CFG_PROFILE_COUNT; ++i )
+    {
+        auto &override{ g_cfg.m_ragebot.m_class_aim_overrides[ i ] };
+        auto enabled_override{ global->add< gui::checkbox >( ASTRAL_XORSTR_STATIC( "Class Aim/FOV override" ), &override.m_enabled ) };
+        auto override_type{ global->add< gui::combo_box >( ASTRAL_XORSTR_STATIC( "Class aim type" ), AIM_TYPES,
+                                                           config::ragebot_t::AIM_TYPE_COUNT, &override.m_aim_type ) };
+        auto override_fov{ global->add< gui::slider_int >( ASTRAL_XORSTR_STATIC( "Class FOV" ), &override.m_fov,
+                                                           1, 180, ASTRAL_XORSTR_STATIC( "deg" ) ) };
+        enabled_override->set_render_on( RAGEBOT_CLASS_OVERRIDE_PREDICATES[ i ] );
+        override_type->set_render_on( RAGEBOT_CLASS_OVERRIDE_ENABLED_PREDICATES[ i ] );
+        override_fov->set_render_on( RAGEBOT_CLASS_OVERRIDE_ENABLED_PREDICATES[ i ] );
+    }
+
+    auto projectile_override{ global->add< gui::checkbox >( ASTRAL_XORSTR_STATIC( "Projectile Aim/FOV override" ),
+        &g_cfg.m_ragebot.m_projectile_aim_override.m_enabled ) };
+    auto projectile_override_type{ global->add< gui::combo_box >( ASTRAL_XORSTR_STATIC( "Projectile aim type" ), AIM_TYPES,
+        config::ragebot_t::AIM_TYPE_COUNT, &g_cfg.m_ragebot.m_projectile_aim_override.m_aim_type ) };
+    auto projectile_override_fov{ global->add< gui::slider_int >( ASTRAL_XORSTR_STATIC( "Projectile FOV" ),
+        &g_cfg.m_ragebot.m_projectile_aim_override.m_fov, 1, 180, ASTRAL_XORSTR_STATIC( "deg" ) ) };
+    SET_ELEMENT( projectile_override );
+    projectile_override_type->set_render_on( &g_cfg.m_ragebot.m_projectile_aim_override.m_enabled );
+    projectile_override_fov->set_render_on( &g_cfg.m_ragebot.m_projectile_aim_override.m_enabled );
+
     auto targets{ global->add< gui::combo_box >( ASTRAL_XORSTR_STATIC( "Targets" ), TARGET_OPTIONS, config::TARGET_COUNT, g_cfg.m_ragebot.m_targets ) };
     targets->set_tooltip( ASTRAL_XORSTR_STATIC( "What should the ragebot actually target at?" ) );
 
@@ -1406,6 +1503,11 @@ static void build_ragebot( )
         config::melee_t::AIM_TYPE_COUNT, &g_cfg.m_melee.m_aim_type ) };
     melee_aim_type->set_tooltip( ASTRAL_XORSTR_STATIC( "Plain visibly turns your view toward the swing. Silent changes only the outgoing command and corrects movement." ) );
     melee_aim_type->set_render_on( &ragebot_context_available );
+
+    auto melee_trigger{ melee->add< gui::checkbox >( ASTRAL_XORSTR_STATIC( "Melee trigger" ), &g_cfg.m_melee.m_trigger ) };
+    melee_trigger->add_module< gui::keybind >( atl::string_view{ }, &g_cfg.m_melee.m_trigger_key );
+    melee_trigger->set_tooltip( ASTRAL_XORSTR_STATIC( "Swings only when the current crosshair direction can connect with a valid melee target." ) );
+    melee_trigger->set_render_on( &ragebot_context_available );
 
     auto auto_swing{ melee->add< gui::checkbox >( ASTRAL_XORSTR_STATIC( "Auto-swing" ), &g_cfg.m_melee.m_auto_swing ) };
     auto_swing->set_tooltip( ASTRAL_XORSTR_STATIC( "Automatically swings when the auto-melee finds a target." ) );
@@ -5356,7 +5458,6 @@ static void build_automations( gui::tab *misc )
     gui::group_box *airblast{ automations->add_group( ICON_FLAME, ASTRAL_XORSTR_STATIC( "Airblast" ), gui::column_t::left ) };
     gui::group_box *medic{ automations->add_group( ICON_ZAP, ASTRAL_XORSTR_STATIC( "Medic" ), gui::column_t::right ) };
     gui::group_box *jump{ automations->add_group( ICON_CHEVRON_UP, ASTRAL_XORSTR_STATIC( "Rocket jump" ), gui::column_t::right ) };
-    gui::group_box *trigger{ automations->add_group( ICON_CROSSHAIR, ASTRAL_XORSTR_STATIC( "Triggerbot" ), gui::column_t::right ) };
     gui::group_box *mvm{ automations->add_group( ICON_ZAP, ASTRAL_XORSTR_STATIC( "Mann vs. Machine" ), gui::column_t::left ) };
     gui::group_box *server{ automations->add_group( ICON_USER, ASTRAL_XORSTR_STATIC( "Server" ), gui::column_t::left ) };
 
@@ -5496,67 +5597,6 @@ static void build_automations( gui::tab *misc )
     blast_crits->set_render_on( &g_cfg.m_air_blast.m_enabled );
     blast_extinguish->set_render_on( &g_cfg.m_air_blast.m_enabled );
     blast_push->set_render_on( &g_cfg.m_air_blast.m_enabled );
-
-    static const char *const TRIGGER_TARGETS[]{
-        ASTRAL_XORSTR_STATIC( "Players" ),
-        ASTRAL_XORSTR_STATIC( "Sentry guns" ),
-        ASTRAL_XORSTR_STATIC( "Dispensers" ),
-        ASTRAL_XORSTR_STATIC( "Teleporters" ),
-    };
-    static const char *const TRIGGER_IGNORES[]{
-        ASTRAL_XORSTR_STATIC( "Cloaked" ),
-        ASTRAL_XORSTR_STATIC( "Disguised" ),
-        ASTRAL_XORSTR_STATIC( "Feigned" ),
-        ASTRAL_XORSTR_STATIC( "Ubered" ),
-        ASTRAL_XORSTR_STATIC( "Bonked" ),
-        ASTRAL_XORSTR_STATIC( "Taunting" ),
-        ASTRAL_XORSTR_STATIC( "Vaccinator" ),
-        ASTRAL_XORSTR_STATIC( "Friends" ),
-        ASTRAL_XORSTR_STATIC( "Astral users" ),
-        ASTRAL_XORSTR_STATIC( "Party members" ),
-    };
-    static const char *const TRIGGER_HITBOXES[]{
-        ASTRAL_XORSTR_STATIC( "Pelvis" ),
-        ASTRAL_XORSTR_STATIC( "Stomach" ),
-        ASTRAL_XORSTR_STATIC( "Lower chest" ),
-        ASTRAL_XORSTR_STATIC( "Chest" ),
-        ASTRAL_XORSTR_STATIC( "Upper chest" ),
-        ASTRAL_XORSTR_STATIC( "Head" ),
-        ASTRAL_XORSTR_STATIC( "Arms" ),
-        ASTRAL_XORSTR_STATIC( "Legs" ),
-    };
-
-    gui::checkbox  *trigger_on{ trigger->add< gui::checkbox >( ASTRAL_XORSTR_STATIC( "Enabled" ), &g_cfg.m_triggerbot.m_enabled ) };
-    gui::combo_box *trigger_targets{ trigger->add< gui::combo_box >(
-        ASTRAL_XORSTR_STATIC( "Targets" ), TRIGGER_TARGETS, 4,
-        g_cfg.m_triggerbot.m_targets ) };
-    gui::combo_box *trigger_boxes{ trigger->add< gui::combo_box >(
-        ASTRAL_XORSTR_STATIC( "Hitboxes" ), TRIGGER_HITBOXES, config::HITSCAN_COUNT,
-        g_cfg.m_triggerbot.m_hitboxes ) };
-    gui::combo_box *trigger_ignores{ trigger->add< gui::combo_box >(
-        ASTRAL_XORSTR_STATIC( "Ignore filters" ), TRIGGER_IGNORES, config::IGNORE_COUNT,
-        g_cfg.m_triggerbot.m_ignores ) };
-
-    trigger_on->add_module< gui::keybind >( string_view{ }, &g_cfg.m_triggerbot.m_key );
-
-    trigger_on->set_tooltip( ASTRAL_XORSTR_STATIC( "Fires your weapon the moment your crosshair "
-                                                  "covers a valid enemy. With no key bound it "
-                                                  "runs constantly." ) )
-        ->set_keywords( ASTRAL_XORSTR_STATIC( "triggerbot trigger auto shoot fire click" ) );
-
-    trigger_targets->set_tooltip( ASTRAL_XORSTR_STATIC( "What the crosshair has to cover for "
-                                                        "the trigger to fire." ) );
-
-    trigger_boxes->set_tooltip( ASTRAL_XORSTR_STATIC( "Which hitboxes count as on-target. "
-                                                      "Only players use hitboxes; buildings "
-                                                      "use their whole body." ) );
-
-    trigger_ignores->set_tooltip( ASTRAL_XORSTR_STATIC( "Enemies in these states are never "
-                                                        "counted as on-target." ) );
-
-    trigger_targets->set_render_on( &g_cfg.m_triggerbot.m_enabled );
-    trigger_boxes->set_render_on( &g_cfg.m_triggerbot.m_enabled );
-    trigger_ignores->set_render_on( &g_cfg.m_triggerbot.m_enabled );
 
     static const char *const PREFER_MODES[]{
         ASTRAL_XORSTR_STATIC( "Heal all" ),

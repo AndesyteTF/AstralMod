@@ -408,7 +408,7 @@ namespace exceptions
 
         // print_callstack( buf, sizeof( buf ) );
 
-        atl::format_append( buf, sizeof( buf ), ASTRAL_XORSTR( "Report this crash in #bugs-and-crashes using CTRL+C.\n\nBuild: " CUR_COMMIT_HASH ).get( ) );
+        atl::format_append( buf, sizeof( buf ), ASTRAL_XORSTR( "Report this crash in #bugs-and-crashes using CTRL+C.\n\nBuild date: " CUR_BUILD_DATE ).get( ) );
 
         I( MessageBoxA )( nullptr, buf, ASTRAL_XORSTR( "astral-error" ).get( ), MB_ICONERROR );
 

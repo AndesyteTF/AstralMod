@@ -65,7 +65,7 @@ i32 ASTRAL_STDCALL hkPresent(
                            point_t{ 8, g_cl.m_screen_height - 32 },
                            color_t{ 255, 255, 255, 128 },
                            ASTRAL_XORSTR( "AstralMod Build at " __DATE__ " " __TIME__ " Last changes by: Andesyte\nConnected to sourcex.club with full websocket activity" ).get( ), //Talia - yes i know it says connected to a server, bite me gonk fucker i thought it was cool
-                           //ASTRAL_XORSTR( "Build " CUR_COMMIT_HASH " at " __DATE__ " " __TIME__ "\nLast changes by: " CUR_COMMIT_AUTHOR ).get( ),
+                           //ASTRAL_XORSTR( "Build " CUR_BUILD_DATE " at " __TIME__ "\nLast changes by: " CUR_COMMIT_AUTHOR ).get( ),
                            true );
 
 #if defined( ASTRAL_DEV )

@@ -411,7 +411,8 @@ void melee_assist::think( )
         this->track_own_path( ctx, own );
     }
 
-    const bool keyed{ gui::bind_active( g_cfg.m_melee.m_activate_key ) };
+    const bool trigger_active{ g_cfg.m_melee.m_trigger && gui::bind_active( g_cfg.m_melee.m_trigger_key ) };
+    const bool keyed{ gui::bind_active( g_cfg.m_melee.m_activate_key ) || trigger_active };
     if ( !keyed && this->m_smack_time <= 0.0f && this->m_auto_command != g_cl.m_cmd->command_number - 1 )
     {
         return;
@@ -432,6 +433,34 @@ void melee_assist::think( )
     }
 
     this->fetch_targets( );
+
+    if ( trigger_active )
+    {
+        const vec3 eye{ g_cl.m_local->Weapon_ShootPosition( ) };
+        for ( const melee_target_t &target : this->m_targets )
+        {
+            melee_point_t point{ };
+            if ( target.m_is_player )
+            {
+                const lag_record_t *record{ g_lagcomp.record( target.m_entity->entindex( ), 0 ) };
+                if ( !record ) continue;
+                point = record_point( *record, target.m_entity->As< C_TFPlayer * >( )->m_flModelScale( ) );
+            } else
+            {
+                point = building_point( target.m_entity );
+            }
+            if ( swing_connects( eye, g_cl.m_cmd->viewangles, ctx, target.m_entity, point ) )
+            {
+                g_cl.m_cmd->buttons |= IN_ATTACK;
+                this->m_auto_command = g_cl.m_cmd->command_number;
+                return;
+            }
+        }
+        if ( !gui::bind_active( g_cfg.m_melee.m_activate_key ) )
+        {
+            return;
+        }
+    }
 
     if ( sapper )
     {
@@ -1000,12 +1029,29 @@ void melee_assist::aim( const vec3 &angle, i32 declare_tick )
 {
     const vec3 original{ g_cl.m_cmd->viewangles };
     vec3 view_angle{ angle };
-    g_cl.m_cmd->viewangles = view_angle;
 
     const usize aim_type{ math::clamp( g_cfg.m_melee.m_aim_type,
                                        static_cast< usize >( 0 ),
                                        static_cast< usize >( config::melee_t::AIM_TYPE_COUNT - 1 ) ) };
-    if ( aim_type == config::melee_t::AIM_PLAIN )
+    const bool steered{ aim_type == config::melee_t::AIM_SMOOTH ||
+                        aim_type == config::melee_t::AIM_ASSISTIVE ||
+                        aim_type == config::melee_t::AIM_LEGIT ||
+                        aim_type == config::melee_t::AIM_SMOOTH_VELOCITY ||
+                        aim_type == config::melee_t::AIM_HUMANIZED };
+    if ( steered )
+    {
+        vec3 delta{ math::normalize_yaw( view_angle.x - original.x ),
+                    math::normalize_yaw( view_angle.y - original.y ), 0.0f };
+        f32 strength{ static_cast< f32 >( math::clamp( g_cfg.m_ragebot.m_aim_strength, 1, 100 ) ) / 100.0f };
+        if ( aim_type == config::melee_t::AIM_ASSISTIVE ) strength *= 0.5f;
+        if ( aim_type == config::melee_t::AIM_LEGIT ) strength *= 0.35f;
+        if ( aim_type == config::melee_t::AIM_HUMANIZED ) strength *= 0.7f;
+        view_angle = original + delta * math::clamp( strength, 0.05f, 1.0f );
+        math::clamp_angles( view_angle );
+    }
+
+    g_cl.m_cmd->viewangles = view_angle;
+    if ( aim_type == config::melee_t::AIM_PLAIN || steered )
     {
         g_tf2.m_engine->SetViewAngles( view_angle );
     } else

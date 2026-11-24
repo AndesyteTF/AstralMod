@@ -1203,10 +1203,13 @@ void ragebot::think( )
     this->m_projectile_profile = g_cfg.m_ragebot.m_projectile_profiles[ client::get_profile( ) ];
 
     const bool run_aimbot{ should_run( ) };
+    const bool run_projectile_trigger{ should_run( true ) };
+    this->m_projectile_trigger_active = false;
+    this->m_projectile_trigger_only   = false;
     const bool manual_shot{ g_cfg.m_ragebot.m_manual_backtrack && g_cl.m_cmd && g_cl.m_local &&
                             g_cl.m_weapon && !is_blacklisted_weapon( g_cl.m_weapon ) && g_cl.m_local->IsAlive( ) &&
                             ( g_cl.m_cmd->buttons & IN_ATTACK ) != 0 };
-    if ( !run_aimbot && !manual_shot )
+    if ( !run_aimbot && !run_projectile_trigger && !manual_shot )
     {
         this->m_visual_target       = INVALID_EHANDLE_INDEX;
         this->m_human_target        = INVALID_EHANDLE_INDEX;
@@ -1216,6 +1219,11 @@ void ragebot::think( )
         this->m_human_last_fire_time = 0.0;
         this->m_human_switch_target  = INVALID_EHANDLE_INDEX;
         this->m_human_switch_time    = 0.0;
+        this->m_projectile_trigger_inside  = false;
+        this->m_projectile_trigger_point_valid = false;
+        this->m_projectile_trigger_target  = INVALID_EHANDLE_INDEX;
+        this->m_projectile_trigger_entered = 0.0;
+        this->m_projectile_trigger_delay   = 0;
         return;
     }
 
@@ -1234,6 +1242,29 @@ void ragebot::think( )
         return;
     }
 
+    this->m_resolved_aim_type = math::clamp( g_cfg.m_ragebot.m_aim_type, static_cast< usize >( 0 ),
+                                             static_cast< usize >( config::ragebot_t::AIM_TYPE_COUNT - 1 ) );
+    this->m_resolved_fov = math::clamp( g_cfg.m_ragebot.m_fov, 1, 180 );
+    const usize profile{ client::get_profile( ) };
+    const auto &class_override{ g_cfg.m_ragebot.m_class_aim_overrides[ profile ] };
+    if ( class_override.m_enabled )
+    {
+        this->m_resolved_aim_type = math::clamp( class_override.m_aim_type, static_cast< usize >( 0 ),
+                                                 static_cast< usize >( config::ragebot_t::AIM_TYPE_COUNT - 1 ) );
+        this->m_resolved_fov = math::clamp( class_override.m_fov, 1, 180 );
+    }
+    const auto &projectile_override{ g_cfg.m_ragebot.m_projectile_aim_override };
+    if ( m_weapon_data.m_weapon_type == weapon_type::projectile_weapon && projectile_override.m_enabled )
+    {
+        this->m_resolved_aim_type = math::clamp( projectile_override.m_aim_type, static_cast< usize >( 0 ),
+                                                 static_cast< usize >( config::ragebot_t::AIM_TYPE_COUNT - 1 ) );
+        this->m_resolved_fov = math::clamp( projectile_override.m_fov, 1, 180 );
+    }
+
+    this->m_projectile_trigger_active = run_projectile_trigger &&
+                                        m_weapon_data.m_weapon_type == weapon_type::projectile_weapon;
+    this->m_projectile_trigger_only   = this->m_projectile_trigger_active && !run_aimbot;
+
     projectile_profile_scope projectile_profile{
         g_cfg.m_ragebot.m_projectile_profiler &&
         m_weapon_data.m_weapon_type == weapon_type::projectile_weapon
@@ -1244,7 +1275,7 @@ void ragebot::think( )
         this->backtrack_manual_shot( );
     }
 
-    if ( !run_aimbot )
+    if ( !run_aimbot && !this->m_projectile_trigger_active )
     {
         this->m_visual_target       = INVALID_EHANDLE_INDEX;
         this->m_human_target        = INVALID_EHANDLE_INDEX;
@@ -1272,7 +1303,11 @@ void ragebot::think( )
     ragebot_target_t target{ };
     if ( !this->find_target( target ) )
     {
-        this->m_visual_target = INVALID_EHANDLE_INDEX;
+        this->m_visual_target              = INVALID_EHANDLE_INDEX;
+        this->m_projectile_trigger_inside  = false;
+        this->m_projectile_trigger_point_valid = false;
+        this->m_projectile_trigger_entered = 0.0;
+        this->m_projectile_trigger_delay   = 0;
         return;
     }
 
@@ -1562,25 +1597,35 @@ bool ragebot::fill_weapon_data( f32 charge_time )
     return true;
 }
 
-bool ragebot::should_run( )
+bool ragebot::should_run( bool projectile_trigger )
 {
-    if ( !g_cfg.m_ragebot.m_enabled )
+    if ( projectile_trigger )
     {
-        return false;
-    }
-
-    const bool on_attack{ g_cfg.m_ragebot.m_activate_key.m_mode == bind_mode_t::on_attack };
-    if ( on_attack ? !( g_cl.m_cmd->buttons & IN_ATTACK )
-                   : !gui::bind_active( g_cfg.m_ragebot.m_activate_key ) )
-    {
-        return false;
-    }
-
-    if ( !g_cfg.m_ragebot.m_auto_shoot )
-    {
-        if ( !( g_cl.m_cmd->buttons & IN_ATTACK ) && !g_cl.will_fire_this_tick( ) )
+        if ( !g_cfg.m_ragebot.m_projectile_trigger ||
+             !gui::bind_active( g_cfg.m_ragebot.m_projectile_trigger_key ) )
         {
             return false;
+        }
+    } else
+    {
+        if ( !g_cfg.m_ragebot.m_enabled )
+        {
+            return false;
+        }
+
+        const bool on_attack{ g_cfg.m_ragebot.m_activate_key.m_mode == bind_mode_t::on_attack };
+        if ( on_attack ? !( g_cl.m_cmd->buttons & IN_ATTACK )
+                       : !gui::bind_active( g_cfg.m_ragebot.m_activate_key ) )
+        {
+            return false;
+        }
+
+        if ( !g_cfg.m_ragebot.m_auto_shoot )
+        {
+            if ( !( g_cl.m_cmd->buttons & IN_ATTACK ) && !g_cl.will_fire_this_tick( ) )
+            {
+                return false;
+            }
         }
     }
 
@@ -1971,7 +2016,7 @@ void ragebot::fetch_initial_targets( )
                         fov = math::smaller( fov, math::calc_fov( va, historical_angle ) );
                     }
                 }
-                if ( g_cfg.m_ragebot.m_fov < 180 && fov > static_cast< f32 >( g_cfg.m_ragebot.m_fov ) )
+                if ( m_resolved_fov < 180 && fov > static_cast< f32 >( m_resolved_fov ) )
                 {
                     switch ( m_weapon_data.m_weapon_type )
                     {
@@ -2081,7 +2126,7 @@ void ragebot::fetch_initial_targets( )
             math::vector_angles( center - shoot_pos, angle );
 
             const f32 fov{ math::calc_fov( va, angle ) };
-            if ( g_cfg.m_ragebot.m_fov < 180 && fov > static_cast< f32 >( g_cfg.m_ragebot.m_fov ) )
+            if ( m_resolved_fov < 180 && fov > static_cast< f32 >( m_resolved_fov ) )
             {
                 continue;
             }
@@ -2135,7 +2180,7 @@ void ragebot::fetch_initial_targets( )
             math::vector_angles( center - shoot_pos, angle );
 
             const f32 fov{ math::calc_fov( va, angle ) };
-            if ( g_cfg.m_ragebot.m_fov < 180 && fov > static_cast< f32 >( g_cfg.m_ragebot.m_fov ) )
+            if ( m_resolved_fov < 180 && fov > static_cast< f32 >( m_resolved_fov ) )
             {
                 continue;
             }
@@ -2174,7 +2219,7 @@ void ragebot::fetch_initial_targets( )
             math::vector_angles( center - shoot_pos, angle );
 
             const f32 fov{ math::calc_fov( va, angle ) };
-            if ( g_cfg.m_ragebot.m_fov < 180 && fov > static_cast< f32 >( g_cfg.m_ragebot.m_fov ) )
+            if ( m_resolved_fov < 180 && fov > static_cast< f32 >( m_resolved_fov ) )
             {
                 continue;
             }
@@ -2229,8 +2274,8 @@ bool ragebot::get_best_target( ragebot_target_t &out )
     }
 
     const double now{ g_tf2.m_engine->Plat_FloatTime( ) };
-    const bool   humanized{ g_cfg.m_ragebot.m_aim_type == config::ragebot_t::AIM_HUMANIZED ||
-                            g_cfg.m_ragebot.m_aim_type == config::ragebot_t::AIM_LEGIT };
+    const bool   humanized{ m_resolved_aim_type == config::ragebot_t::AIM_HUMANIZED ||
+                            m_resolved_aim_type == config::ragebot_t::AIM_LEGIT };
     const bool   prefer_human_target{ humanized && this->m_human_target != INVALID_EHANDLE_INDEX };
     auto sample_range = [ ]( i32 min_v, i32 max_v ) -> i32
     {
@@ -2477,7 +2522,7 @@ bool ragebot::get_building_aimpoint( ragebot_target_t &out )
 
 bool ragebot::within_fov( const vec3 &shoot_pos, const vec3 &point ) const
 {
-    if ( g_cfg.m_ragebot.m_fov >= 180 )
+    if ( m_resolved_fov >= 180 )
     {
         return true;
     }
@@ -2491,7 +2536,7 @@ bool ragebot::within_fov( const vec3 &shoot_pos, const vec3 &point ) const
     vec3 ang_to_point{ };
     math::vector_angles( point - shoot_pos, ang_to_point );
 
-    return math::calc_fov( this->m_view_angles, ang_to_point ) <= static_cast< f32 >( g_cfg.m_ragebot.m_fov );
+    return math::calc_fov( this->m_view_angles, ang_to_point ) <= static_cast< f32 >( m_resolved_fov );
 }
 
 bool ragebot::trace_hitbox(
@@ -2610,7 +2655,7 @@ bool ragebot::shot_registers( const mstudiohitboxset_t *set, const scan_pose_t &
 
 void ragebot::paint( ) const
 {
-    if ( !g_cfg.m_ragebot.m_enabled ||
+    if ( ( !g_cfg.m_ragebot.m_enabled && !g_cfg.m_ragebot.m_projectile_trigger ) ||
          !g_tf2.m_engine->IsInGame( ) ||
          !g_cl.m_local ||
          !g_cl.m_weapon )
@@ -2639,12 +2684,14 @@ void ragebot::paint( ) const
     }
 
     this->paint_fov_circle( );
+    this->paint_projectile_trigger( );
     this->paint_shot_mark( );
 }
 
 void ragebot::render( ) const
 {
-    if ( !g_cfg.m_ragebot.m_enabled || !g_tf2.m_engine->IsInGame( ) || ragebot_ui_blocks_aim( ) )
+    if ( ( !g_cfg.m_ragebot.m_enabled && !this->m_projectile_trigger_active ) ||
+         !g_tf2.m_engine->IsInGame( ) || ragebot_ui_blocks_aim( ) )
     {
         return;
     }
@@ -3114,7 +3161,7 @@ void ragebot::paint_fov_circle( ) const
         g_draw.circle( center, color, radius, thickness );
     };
 
-    draw_cone( static_cast< f32 >( g_cfg.m_ragebot.m_fov ),
+    draw_cone( static_cast< f32 >( m_resolved_fov ),
                g_cfg.m_ragebot.m_fov_color, 1.5f );
 
     if ( g_cfg.m_ragebot.m_aim_rings )
@@ -3125,6 +3172,28 @@ void ragebot::paint_fov_circle( ) const
         draw_cone( static_cast< f32 >( g_cfg.m_ragebot.m_aim_ring_outer_fov ), outer, 1.0f );
         draw_cone( static_cast< f32 >( g_cfg.m_ragebot.m_aim_ring_inner_fov ), inner, 1.25f );
     }
+}
+
+void ragebot::paint_projectile_trigger( ) const
+{
+    if ( !this->m_projectile_trigger_active )
+    {
+        return;
+    }
+
+    const vec2 center{ static_cast< f32 >( g_cl.m_screen_width ) * 0.5f,
+                       static_cast< f32 >( g_cl.m_screen_height ) * 0.5f };
+    const color_t color{ this->m_projectile_trigger_inside
+                             ? g_cfg.m_ragebot.m_projectile_trigger_active_color
+                             : g_cfg.m_ragebot.m_projectile_trigger_color };
+    const f32 radius{ static_cast< f32 >( math::clamp( g_cfg.m_ragebot.m_projectile_trigger_radius, 4, 240 ) ) };
+    if ( this->m_projectile_trigger_point_valid )
+    {
+        g_draw.line( center, this->m_projectile_trigger_point, color,
+                     this->m_projectile_trigger_inside ? 1.5f : 1.0f );
+        g_draw.circle( this->m_projectile_trigger_point, color, 3.0f, 1.5f );
+    }
+    g_draw.circle( center, color, radius, this->m_projectile_trigger_inside ? 2.0f : 1.5f );
 }
 
 i32 ragebot::extreme_seeds( const salvo_mask_t &mask, vec3 *points, i32 *hitboxes ) const
@@ -7027,8 +7096,8 @@ bool ragebot::get_projectile_target( ragebot_target_t &out )
     i32            walked{ };
 
     const double now{ g_tf2.m_engine->Plat_FloatTime( ) };
-    const bool   humanized{ g_cfg.m_ragebot.m_aim_type == config::ragebot_t::AIM_HUMANIZED ||
-                            g_cfg.m_ragebot.m_aim_type == config::ragebot_t::AIM_LEGIT };
+    const bool   humanized{ m_resolved_aim_type == config::ragebot_t::AIM_HUMANIZED ||
+                            m_resolved_aim_type == config::ragebot_t::AIM_LEGIT };
     const bool   humanized_projectile_tracking{ humanized && !m_weapon_data.m_is_sticky };
     const bool   prefer_human_target{ humanized_projectile_tracking && this->m_human_target != INVALID_EHANDLE_INDEX };
     auto sample_range = [ ]( i32 min_v, i32 max_v ) -> i32
@@ -7815,10 +7884,10 @@ namespace
         return type < config::ragebot_t::AIM_TYPE_COUNT;
     }
 
-    usize resolve_aim_type( f32 target_fov )
+    usize resolve_aim_type( f32 target_fov, usize base_aim_type )
     {
         const config::ragebot_t &cfg{ g_cfg.m_ragebot };
-        const usize base{ math::clamp( cfg.m_aim_type, static_cast< usize >( 0 ),
+        const usize base{ math::clamp( base_aim_type, static_cast< usize >( 0 ),
                                       static_cast< usize >( config::ragebot_t::AIM_TYPE_COUNT - 1 ) ) };
 
         usize ring_type{ config::ragebot_t::AIM_TYPE_COUNT };
@@ -7864,7 +7933,7 @@ namespace
         return configured_aim_type( ring_type ) ? ring_type : base;
     }
 
-    ASTRAL_FORCE_INLINE f32 apply_smooth_curve( f32 strength, f32 distance, usize aim_type )
+    ASTRAL_FORCE_INLINE f32 apply_smooth_curve( f32 strength, f32 distance, usize aim_type, i32 configured_fov )
     {
         const usize curve{ math::clamp( g_cfg.m_ragebot.m_smooth_curve, static_cast< usize >( 0 ),
                                         static_cast< usize >( config::ragebot_t::SMOOTH_CURVE_COUNT - 1 ) ) };
@@ -7873,7 +7942,7 @@ namespace
             return strength;
         }
 
-        const f32 aim_fov{ math::bigger( 1.0f, static_cast< f32 >( g_cfg.m_ragebot.m_fov ) ) };
+        const f32 aim_fov{ math::bigger( 1.0f, static_cast< f32 >( configured_fov ) ) };
         const f32 fov_ratio{ math::clamp( distance / aim_fov, 0.0f, 1.0f ) };
         const f32 close_ratio{ 1.0f - fov_ratio };
         f32 shaped{ 1.0f };
@@ -7896,7 +7965,7 @@ namespace
         return strength * math::clamp( shaped, 0.05f, 1.0f );
     }
 
-    vec3 ragebot_steered_angle( const vec3 &current, const vec3 &target, C_BaseEntity *entity, usize type )
+    vec3 ragebot_steered_angle( const vec3 &current, const vec3 &target, C_BaseEntity *entity, usize type, i32 configured_fov )
     {
         vec3 delta{ math::normalize_yaw( target.x - current.x ), math::normalize_yaw( target.y - current.y ),
                     math::normalize_yaw( target.z - current.z ) };
@@ -7920,7 +7989,7 @@ namespace
              type == config::ragebot_t::AIM_ASSISTIVE || type == config::ragebot_t::AIM_HUMANIZED ||
              type == config::ragebot_t::AIM_LEGIT )
         {
-            strength = apply_smooth_curve( strength, distance, type );
+            strength = apply_smooth_curve( strength, distance, type, configured_fov );
         }
 
         if ( type == config::ragebot_t::AIM_LEGIT || type == config::ragebot_t::AIM_HUMANIZED )
@@ -7957,16 +8026,17 @@ void ragebot::aim_at_target( const ragebot_target_t &tgt )
     const bool starting_charge{ this->m_charge_starting };
 
     const bool thrown_jar{ g_cl.is_delayed_throw_weapon( g_cl.m_weapon ) };
-    const usize aim_type{ resolve_aim_type( tgt.m_fov_to ) };
+    const usize aim_type{ resolve_aim_type( tgt.m_fov_to, m_resolved_aim_type ) };
     const vec3 initial_exact{ ragebot_exact_angle( aim_angle, m_weapon_data.m_weapon_type ) };
     const vec3 initial_steered{ visible_aim_type( aim_type )
-                                    ? ragebot_steered_angle( m_view_angles, initial_exact, tgt.m_entity, aim_type )
+                                    ? ragebot_steered_angle( m_view_angles, initial_exact, tgt.m_entity, aim_type, m_resolved_fov )
                                     : initial_exact };
     const f32 convergence{ math::calc_fov( initial_steered, initial_exact ) };
     const double now{ g_tf2.m_engine->Plat_FloatTime( ) };
 
-    const bool human_style{ aim_type == config::ragebot_t::AIM_HUMANIZED ||
-                            aim_type == config::ragebot_t::AIM_LEGIT };
+    const bool human_style{ !this->m_projectile_trigger_only &&
+                            ( aim_type == config::ragebot_t::AIM_HUMANIZED ||
+                              aim_type == config::ragebot_t::AIM_LEGIT ) };
     if ( human_style )
     {
         auto sample_range = [ ]( i32 min_v, i32 max_v ) -> i32
@@ -8022,7 +8092,8 @@ void ragebot::aim_at_target( const ragebot_target_t &tgt )
                                ? static_cast< f32 >( math::clamp( proj_tol, 10, 300 ) ) * 0.01f
                                : 0.8f;
     }
-    if ( visible_aim_type( aim_type ) && convergence > fire_convergence )
+    if ( !this->m_projectile_trigger_only &&
+         visible_aim_type( aim_type ) && convergence > fire_convergence )
     {
         able_to_fire = false;
         if ( human_style )
@@ -8080,6 +8151,48 @@ void ragebot::aim_at_target( const ragebot_target_t &tgt )
         }
     }
 
+    if ( this->m_projectile_trigger_active )
+    {
+        const u32 target_handle{ static_cast< u32 >( tgt.m_entity->GetRefEHandle( ).ToInt( ) ) };
+        vec2 aim_screen{ };
+        const bool on_screen{ g_cl.world_to_screen( aim_point, aim_screen ) };
+        const vec2 center{ static_cast< f32 >( g_cl.m_screen_width ) * 0.5f,
+                           static_cast< f32 >( g_cl.m_screen_height ) * 0.5f };
+        const f32 radius{ static_cast< f32 >( math::clamp( g_cfg.m_ragebot.m_projectile_trigger_radius, 4, 240 ) ) };
+        const vec2 offset{ aim_screen - center };
+        const bool inside{ on_screen && offset.length( ) <= radius };
+
+        this->m_projectile_trigger_point_valid = on_screen;
+        this->m_projectile_trigger_point       = aim_screen;
+
+        if ( target_handle != this->m_projectile_trigger_target )
+        {
+            this->m_projectile_trigger_target  = target_handle;
+            this->m_projectile_trigger_entered = 0.0;
+            this->m_projectile_trigger_delay   = 0;
+        }
+
+        this->m_projectile_trigger_inside = inside;
+        if ( inside )
+        {
+            if ( this->m_projectile_trigger_entered <= 0.0 )
+            {
+                const i32 minimum{ math::clamp( g_cfg.m_ragebot.m_projectile_trigger_delay_min, 0, 1000 ) };
+                const i32 maximum{ math::clamp( g_cfg.m_ragebot.m_projectile_trigger_delay_max, minimum, 1000 ) };
+                this->m_projectile_trigger_entered = now;
+                this->m_projectile_trigger_delay   = g_tf2.random_int( minimum, maximum );
+            }
+
+            const double delay{ static_cast< double >( this->m_projectile_trigger_delay ) * 0.001 };
+            able_to_fire = able_to_fire && now - this->m_projectile_trigger_entered >= delay;
+        } else
+        {
+            this->m_projectile_trigger_entered = 0.0;
+            this->m_projectile_trigger_delay   = 0;
+            able_to_fire = false;
+        }
+    }
+
     const bool delay_requested_shot{ g_cfg.m_ragebot.m_activate_key.m_mode == bind_mode_t::on_attack &&
                                      g_cfg.m_ragebot.m_delay_shot };
     if ( delay_requested_shot && !able_to_fire )
@@ -8091,7 +8204,7 @@ void ragebot::aim_at_target( const ragebot_target_t &tgt )
     if ( ( able_to_fire || m_weapon_data.m_should_fire_always_set_attack_bits ) &&
          !( delay_requested_shot && !able_to_fire ) )
     {
-        if ( g_cfg.m_ragebot.m_auto_shoot )
+        if ( g_cfg.m_ragebot.m_auto_shoot || this->m_projectile_trigger_active )
         {
             if ( m_weapon_data.m_fires_on_attack_release &&
                  m_weapon_data.m_weapon_type == weapon_type::projectile_weapon )
@@ -8180,7 +8293,7 @@ void ragebot::aim_at_target( const ragebot_target_t &tgt )
                 this->m_visual_target     = INVALID_EHANDLE_INDEX;
                 this->m_charge_managed    = managed_charge;
                 this->m_charge_starting   = starting_charge;
-                if ( g_cfg.m_ragebot.m_auto_shoot )
+                if ( g_cfg.m_ragebot.m_auto_shoot || this->m_projectile_trigger_active )
                 {
                     if ( m_weapon_data.m_fires_on_attack_release )
                     {
@@ -8212,7 +8325,8 @@ void ragebot::aim_at_target( const ragebot_target_t &tgt )
     this->m_visual_target_time = this->m_visual_time;
 
     const bool fire_now{ g_cl.will_fire_this_tick( ) };
-    const bool psilent{ m_weapon_data.m_weapon_type == weapon_type::projectile_weapon &&
+    const bool psilent{ !this->m_projectile_trigger_only &&
+                        m_weapon_data.m_weapon_type == weapon_type::projectile_weapon &&
                         !thrown_jar };
 
     const bool shot_input{ m_weapon_data.m_fires_on_attack_release
@@ -8222,12 +8336,12 @@ void ragebot::aim_at_target( const ragebot_target_t &tgt )
 
     const vec3 exact_angle{ ragebot_exact_angle( aim_angle, m_weapon_data.m_weapon_type ) };
     vec3 applied_angle{ exact_angle };
-    if ( visible_aim_type( aim_type ) )
+    if ( !this->m_projectile_trigger_only && visible_aim_type( aim_type ) )
     {
-        applied_angle = ragebot_steered_angle( m_view_angles, exact_angle, tgt.m_entity, aim_type );
+        applied_angle = ragebot_steered_angle( m_view_angles, exact_angle, tgt.m_entity, aim_type, m_resolved_fov );
         g_cl.m_cmd->viewangles = applied_angle;
         g_tf2.m_engine->SetViewAngles( applied_angle );
-    } else if ( aim_type == config::ragebot_t::AIM_LOCKING )
+    } else if ( !this->m_projectile_trigger_only && aim_type == config::ragebot_t::AIM_LOCKING )
     {
         const vec3 original{ g_cl.m_cmd->viewangles };
         g_cl.m_cmd->viewangles = exact_angle;
@@ -8238,15 +8352,18 @@ void ragebot::aim_at_target( const ragebot_target_t &tgt )
     {
         vec3 send_angle{ visible_aim_type( aim_type ) ? applied_angle : exact_angle };
 
-        const vec3 *held{ g_holdaim_mgr.held( ) };
-        const vec3 original{ g_cl.m_cmd->viewangles };
-        g_cl.m_cmd->viewangles = held ? *held : send_angle; // NOT DOING THIS RESULTS IN UNDER-DAMAGE: BAD!
-        if ( aim_type == config::ragebot_t::AIM_PLAIN )
+        if ( !this->m_projectile_trigger_only )
         {
-            g_tf2.m_engine->SetViewAngles( g_cl.m_cmd->viewangles );
-        } else if ( aim_type == config::ragebot_t::AIM_SILENT || aim_type == config::ragebot_t::AIM_LOCKING )
-        {
-            g_cl.fix_movement( g_cl.m_cmd, original );
+            const vec3 *held{ g_holdaim_mgr.held( ) };
+            const vec3 original{ g_cl.m_cmd->viewangles };
+            g_cl.m_cmd->viewangles = held ? *held : send_angle; // NOT DOING THIS RESULTS IN UNDER-DAMAGE: BAD!
+            if ( aim_type == config::ragebot_t::AIM_PLAIN )
+            {
+                g_tf2.m_engine->SetViewAngles( g_cl.m_cmd->viewangles );
+            } else if ( aim_type == config::ragebot_t::AIM_SILENT || aim_type == config::ragebot_t::AIM_LOCKING )
+            {
+                g_cl.fix_movement( g_cl.m_cmd, original );
+            }
         }
 
         if ( m_weapon_data.m_weapon_type == weapon_type::hitscan_weapon &&
@@ -8291,6 +8408,12 @@ void ragebot::aim_at_target( const ragebot_target_t &tgt )
                                       ( g_cfg.m_ragebot.m_projectile_path_animate
                                             ? math::bigger( 1.0, travel_time )
                                             : 1.0 );
+        }
+
+        if ( fire_now && this->m_projectile_trigger_active )
+        {
+            this->m_projectile_trigger_entered = 0.0;
+            this->m_projectile_trigger_delay   = 0;
         }
     }
 }

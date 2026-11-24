@@ -669,6 +669,14 @@ static void config_fields( config::ragebot_projectile_profile_t &value, visitor 
 }
 
 template< typename visitor >
+static void config_fields( config::ragebot_t::aim_override_t &value, visitor &field )
+{
+    field( ASTRAL_XORSTR( "enabled" ).get( ), value.m_enabled );
+    field( ASTRAL_XORSTR( "aim_type" ).get( ), value.m_aim_type );
+    field( ASTRAL_XORSTR( "fov" ).get( ), value.m_fov );
+}
+
+template< typename visitor >
 static void config_fields( config::ragebot_t &value, visitor &field )
 {
     field( ASTRAL_XORSTR( "enabled" ).get( ), value.m_enabled );
@@ -690,10 +698,19 @@ static void config_fields( config::ragebot_t &value, visitor &field )
     field( ASTRAL_XORSTR( "smooth_curve" ).get( ), value.m_smooth_curve );
     field( ASTRAL_XORSTR( "smooth_curve_amount" ).get( ), value.m_smooth_curve_amount );
     field( ASTRAL_XORSTR( "fov" ).get( ), value.m_fov );
+    field( ASTRAL_XORSTR( "class_aim_overrides" ).get( ), value.m_class_aim_overrides );
+    field( ASTRAL_XORSTR( "projectile_aim_override" ).get( ), value.m_projectile_aim_override );
     field( ASTRAL_XORSTR( "draw_fov" ).get( ), value.m_draw_fov );
     field( ASTRAL_XORSTR( "fov_color" ).get( ), value.m_fov_color );
     field( ASTRAL_XORSTR( "draw_crosshair" ).get( ), value.m_draw_crosshair );
     field( ASTRAL_XORSTR( "auto_shoot" ).get( ), value.m_auto_shoot );
+    field( ASTRAL_XORSTR( "projectile_trigger" ).get( ), value.m_projectile_trigger );
+    field( ASTRAL_XORSTR( "projectile_trigger_key" ).get( ), value.m_projectile_trigger_key );
+    field( ASTRAL_XORSTR( "projectile_trigger_radius" ).get( ), value.m_projectile_trigger_radius );
+    field( ASTRAL_XORSTR( "projectile_trigger_delay_min" ).get( ), value.m_projectile_trigger_delay_min );
+    field( ASTRAL_XORSTR( "projectile_trigger_delay_max" ).get( ), value.m_projectile_trigger_delay_max );
+    field( ASTRAL_XORSTR( "projectile_trigger_color" ).get( ), value.m_projectile_trigger_color );
+    field( ASTRAL_XORSTR( "projectile_trigger_active_color" ).get( ), value.m_projectile_trigger_active_color );
     field( ASTRAL_XORSTR( "delay_shot" ).get( ), value.m_delay_shot );
     field( ASTRAL_XORSTR( "allow_aim_in_ui" ).get( ), value.m_allow_aim_in_ui );
     field( ASTRAL_XORSTR( "manual_backtrack" ).get( ), value.m_manual_backtrack );
@@ -755,6 +772,8 @@ static void config_fields( config::melee_t &value, visitor &field )
     field( ASTRAL_XORSTR( "enabled" ).get( ), value.m_enabled );
     field( ASTRAL_XORSTR( "activate_key" ).get( ), value.m_activate_key );
     field( ASTRAL_XORSTR( "aim_type" ).get( ), value.m_aim_type );
+    field( ASTRAL_XORSTR( "trigger" ).get( ), value.m_trigger );
+    field( ASTRAL_XORSTR( "trigger_key" ).get( ), value.m_trigger_key );
     field( ASTRAL_XORSTR( "auto_swing" ).get( ), value.m_auto_swing );
     field( ASTRAL_XORSTR( "auto_backstab" ).get( ), value.m_auto_backstab );
     field( ASTRAL_XORSTR( "swing_prediction" ).get( ), value.m_swing_prediction );

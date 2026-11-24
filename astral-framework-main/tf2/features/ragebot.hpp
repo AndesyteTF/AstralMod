@@ -333,7 +333,7 @@ private:
     };
 
     bool  fill_weapon_data( f32 charge_time = -1.0f );
-    bool  should_run( );
+    bool  should_run( bool projectile_trigger = false );
     bool  holds_aim_key( );
     bool  do_prefetch_logic( );
     bool  is_hitbox_allowed_for_current_state( i32 hitbox ) const;
@@ -406,6 +406,7 @@ private:
 
     void paint_target_path( ) const;
     void paint_fov_circle( ) const;
+    void paint_projectile_trigger( ) const;
     void paint_shot( ) const;
     void paint_shot_mark( ) const;
     f32  shot_fade( ) const;
@@ -439,6 +440,8 @@ private:
 
     atl::vector< ragebot_target_t > m_targets{ };
     ragebot_weapon_data_t           m_weapon_data{ };
+    usize                           m_resolved_aim_type{ config::ragebot_t::AIM_SILENT };
+    i32                             m_resolved_fov{ 180 };
     projectile_setup_t              m_launch_setup{ };
     move_sim_ctx_t                  m_selected_walk{ };
     i32                             m_selected_catch_up{ };
@@ -562,6 +565,15 @@ private:
     i32    m_human_lock_sample_ms{ 0 };
     i32    m_human_switch_sample_ms{ 0 };
     i32    m_human_fire_interval_sample_ms{ 0 };
+
+    bool   m_projectile_trigger_active{ false };
+    bool   m_projectile_trigger_only{ false };
+    bool   m_projectile_trigger_inside{ false };
+    bool   m_projectile_trigger_point_valid{ false };
+    vec2   m_projectile_trigger_point{ };
+    u32    m_projectile_trigger_target{ INVALID_EHANDLE_INDEX };
+    double m_projectile_trigger_entered{ 0.0 };
+    i32    m_projectile_trigger_delay{ 0 };
 
     config::ragebot_hitscan_profile_t    m_hitscan_profile{ };
     config::ragebot_projectile_profile_t m_projectile_profile{ };
