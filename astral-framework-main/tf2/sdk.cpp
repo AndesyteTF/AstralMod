@@ -2102,6 +2102,18 @@ void *IKeyValuesSystem::AllocKeyValuesMemory( int size )
 
 KeyValues::KeyValues( const char *name )
 {
+    // Keep this initialization local. KeyValues constructors have several
+    // overloads with very similar prologues, which makes a repaired ctor
+    // signature dangerously easy to match to the wrong function.
+    for ( u8 &byte : m_pad )
+    {
+        byte = 0;
+    }
+
+    *reinterpret_cast< i32 * >( m_pad ) = -1;
+    m_pad[ 0x22 ] = 1;
+
+    // m_KeyValues_ctor now resolves KeyValues::SetName.
     g_tf2.m_KeyValues_ctor.call_as< void >( this, name );
 }
 

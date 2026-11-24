@@ -454,7 +454,8 @@ static const development_signature s_signatures[]{
     { api_module::client, "84 C0 75 ? C6 05", 0, false, 0, 0, HASH_RT( "tf2.client.enable_extrapolation_retaddr" ) },
     { api_module::engine, "0F 2F 45 04 0F 82", 0, false, 0, 0, HASH_RT( "tf2.engine.cl_fire_events_retaddr" ) },
     { api_module::engine, "48 8B 2D ? ? ? ? 48 85 ED 0F 84", 0, true, 3, 7, HASH_RT( "tf2.engine.cl_event_queue" ) },
-    { api_module::client, "41 57 48 83 EC ? 48 8B DA 41 B8 ? ? ? ? 33 D2 48 8B E9", 0, false, 0, 0, HASH_RT( "tf2.client.keyvalues_ctor" ) },
+    // KeyValues is initialized locally; this resolves its SetName helper.
+    { api_module::client, "40 53 48 83 EC ? F6 41 23 ? 48 8B C2 48 8B D9 74", 0, false, 0, 0, HASH_RT( "tf2.client.keyvalues_ctor" ) },
     { api_module::engine, "4C 89 4C 24 ? 48 89 4C 24 ? 55 56", 0, false, 0, 0, HASH_RT( "tf2.engine.keyvalues_load_from_buffer" ) },
     { api_module::client, "48 89 5C 24 ? 55 48 83 EC ? 49 8B D8", 0, false, 0, 0, HASH_RT( "tf2.client.keyvalues_set_string" ) },
     { api_module::client, "40 53 48 83 EC ? 41 8B D8 41 B0", 0, false, 0, 0, HASH_RT( "tf2.client.keyvalues_set_int" ) },

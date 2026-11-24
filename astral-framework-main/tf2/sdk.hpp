@@ -5297,7 +5297,9 @@ public:
     // Memory allocation (optimized)
     void *operator new( usize iAllocSize );
 
-    u8 m_pad[ 64 ];
+    // Current 64-bit KeyValues layout is 0x48 bytes. The final pointer at
+    // 0x40 was added after the older 0x40-byte layout.
+    u8 m_pad[ 0x48 ];
 };
 
 class IMemAlloc
